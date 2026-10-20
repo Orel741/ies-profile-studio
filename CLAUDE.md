@@ -25,4 +25,6 @@ put explanations in hover tips (`.infopop` + `data-tip`), not inline paragraphs.
 - Previews compute relative illuminance from the composite. Heat map or grey 18% surface with Kelvin colour and ACES.
   The 3D view ray-casts floor, wall and ceiling against an R16F texture of the composite and scales itself to stay fast.
 - Persistence: localStorage key `ies-profile-studio-v1`, format `v: 2`. Validate everything read back.
+- Project files (`.iesproj`): JSON `{ format: 'ies-profile-studio-project', version: 1, saved, state }`, where `state` is the same
+  object as localStorage (`stateObj()` / `applyState()`). Keep both in step when adding settings; opening a project is undoable.
 - Downloads go through `claude.use('downloads')` when the page runs as a claude.ai artifact, with a plain link fallback.

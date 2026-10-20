@@ -261,6 +261,9 @@ textarea#iesText {
       <p class="sub">Shape a light, preview it, export an IES file for Unreal.</p>
     </div>
     <div class="actions">
+      <button class="btn" id="btnOpenProj" type="button">Open project</button>
+      <input id="projIn" class="vh" type="file" accept=".iesproj,.json,application/json" tabindex="-1" aria-label="Choose a project file to open">
+      <button class="btn" id="btnSaveProj" type="button">Save project</button>
       <button class="btn" id="btnImport" type="button">Import .ies</button>
       <input id="fileIn" class="vh" type="file" accept=".ies,.IES,.txt" tabindex="-1" aria-label="Choose an IES file to import">
     </div>
@@ -3006,6 +3009,32 @@ void main() {
       else say('Saving is not available here (' + ((e && e.code) || 'error') + '). Use Copy file instead.', 'err');
     }
   }
+  /* ---------- project files: a JSON file (.iesproj) with every layer, modifier and setting ---------- */
+  const PROJ_FORMAT = 'ies-profile-studio-project';
+  async function saveProject() {
+    syncCur();
+    const name = slug() + '.iesproj', text = JSON.stringify({ format: PROJ_FORMAT, version: 1, saved: new Date().toISOString(), state: stateObj() });
+    try {
+      if (dl) await dl.save({ filename: name, data: text });
+      else {
+        const a = document.createElement('a'), url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+      }
+      say('Saved the project as ' + name + '. Open it later with Open project to carry on editing.');
+    } catch (e) {
+      if (e && e.code === 'declined') say('Save cancelled.');
+      else say('Saving is not available here (' + ((e && e.code) || 'error') + ').', 'err');
+    }
+  }
+  function openProjectText(text, fname) {
+    let j = null; try { j = JSON.parse(text); } catch (e) { /* not JSON */ }
+    if (!j || j.format !== PROJ_FORMAT || !j.state) { say('"' + fname + '" is not an IES Profile Studio project. To bring in an .ies file, use Import .ies.', 'err'); return; }
+    pushHist(); syncCur();
+    const keep = stateObj();
+    if (!applyState(j.state)) { applyState(keep); say('"' + fname + '" could not be read. Nothing was changed.', 'err'); return; }
+    fieldCache.clear(); renderLayers(); syncAll(); dirty(); queue(); saveSoon();
+    say('Opened ' + fname + ' with ' + S.layers.length + (S.layers.length === 1 ? ' layer.' : ' layers.') + ' Undo goes back to what you had before.');
+  }
   function importText(text, fname) {
     const r = parseIES(text);
     if (r.error) { say(r.error, 'err'); return; }
@@ -3025,17 +3054,19 @@ void main() {
   function saveSoon() {
     clearTimeout(saveT);
     saveT = setTimeout(() => {
-      try {
-        localStorage.setItem(KEY, JSON.stringify({
+      try { localStorage.setItem(KEY, JSON.stringify(stateObj())); } catch (e) { /* storage unavailable */ }
+    }, 500);
+  }
+  // everything needed to carry on editing: the browser keeps one copy, project files carry the same object
+  function stateObj() {
+    return {
           v: 2, active: S.active, preset: S.preset, cur: S.cur,
           layers: (syncCur(), S.layers.map(L => ({ name: L.name, type: L.type, on: L.on, blend: L.blend, amount: L.amount, turn: L.turn, mods: L.mods.map(m => ({ type: m.type, on: m.on, p: m.p })),
             mode: L.mode, planes: L.planes.map(a => Array.from(a, v => +v.toFixed(4))), knots: L.knots, grid: L.grid ? Array.from(L.grid, v => +v.toFixed(4)) : null }))),
           scaleMode: S.scaleMode, peakCd: S.peakCd, fluxLm: S.fluxLm, meta: S.meta, lumensMode: S.lumensMode, vstep: S.vstep, hstep: S.hstep,
           tool: S.tool, brush: S.brush, smoothStr: S.smoothStr, gen: S.gen, xr: S.xr, ys: S.ys,
           hmode: S.hmode, surf: S.surf, ceilD: S.ceilD, cam3d: { yaw: V3.yaw, pitch: V3.pitch, zoom: V3.zoom }, fit: S.fit, floorH: S.floorH, floorRange: S.floorRange, bands: S.bands, wallD: S.wallD, wallC: S.wallC, pvLook: S.pvLook, kelvin: S.kelvin, ev: S.ev, amb: S.amb
-        }));
-      } catch (e) { /* storage unavailable */ }
-    }, 500);
+    };
   }
   function validKnots(k) {
     if (!Array.isArray(k) || k.length < 2 || k.length > 64) return null;
@@ -3047,8 +3078,10 @@ void main() {
     return k[0][0] === 0 && k[k.length - 1][0] === 180 ? k.map(p => [p[0], p[1]]) : null;
   }
   function loadSaved() {
+    try { return applyState(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) { return false; }
+  }
+  function applyState(j) {
     try {
-      const j = JSON.parse(localStorage.getItem(KEY) || 'null');
       if (!j || (j.v !== 1 && j.v !== 2)) return false;
       const num = (x, d, lo, hi) => (typeof x === 'number' && isFinite(x) ? clamp(x, lo, hi) : d);
       const okArr = (a, n) => Array.isArray(a) && a.length === n && a.every(x => typeof x === 'number' && isFinite(x));
@@ -3144,6 +3177,13 @@ void main() {
     $('btnCopy').addEventListener('click', copyIES);
     $('btnZip').addEventListener('click', () => saveFile('zip')); $('btnTxt').addEventListener('click', () => saveFile('txt'));
     $('btnImport').addEventListener('click', () => $('fileIn').click());
+    $('btnSaveProj').addEventListener('click', saveProject);
+    $('btnOpenProj').addEventListener('click', () => $('projIn').click());
+    $('projIn').addEventListener('change', () => {
+      const f = $('projIn').files && $('projIn').files[0]; $('projIn').value = ''; if (!f) return;
+      if (f.size > 32 * 1024 * 1024) { say('That file is too large to be a project.', 'err'); return; }
+      const rd = new FileReader(); rd.onload = () => openProjectText(String(rd.result), f.name); rd.onerror = () => say('That file could not be read.', 'err'); rd.readAsText(f);
+    });
     $('fileIn').addEventListener('change', () => {
       const f = $('fileIn').files && $('fileIn').files[0]; if (!f) return;
       if (f.size > 8 * 1024 * 1024) { say('That file is larger than 8 MB, so it is probably not an IES profile.', 'err'); $('fileIn').value = ''; return; }
