@@ -163,7 +163,7 @@
     });
   }
   function renderPresets() {
-    const host = $('presetRow'); host.textContent = '';
+    const host = $('presetRow'); if (!host) return; host.textContent = '';
     PRESETS.forEach(p => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.textContent = p.name; b.setAttribute('aria-pressed', String(S.preset === p.id));
@@ -1994,7 +1994,7 @@ void main() {
   renderLayers();
   if (window.matchMedia && window.matchMedia('(max-width: 700px)').matches) { $('genDet').open = false; $('expDet').open = false; }
   syncAll(); queue();
-  say('Pick a starting point, then drag the points on the curve. Everything updates live.');
+  say('Drag the points on the curve. New starting curves are under + Add layer.');
   (async () => {
     try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
     $('btnZip').hidden = !dl; $('btnTxt').hidden = !dl;

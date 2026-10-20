@@ -263,17 +263,10 @@ textarea#iesText {
     <div class="actions">
       <button class="btn" id="btnImport" type="button">Import .ies</button>
       <input id="fileIn" class="vh" type="file" accept=".ies,.IES,.txt" tabindex="-1" aria-label="Choose an IES file to import">
-      <button class="btn" id="btnCopy" type="button">Copy file</button>
-      <button class="btn primary" id="btnZip" type="button" hidden>Save .zip</button>
-      <button class="btn" id="btnTxt" type="button" hidden>Save .txt</button>
     </div>
   </header>
   <p id="status" role="status" aria-live="polite"></p>
 
-  <section class="presets" aria-label="Starting points">
-    <span class="eyebrow">Start from</span>
-    <div class="chips" id="presetRow"></div>
-  </section>
 
   <div class="layout">
     <section class="work">
@@ -481,6 +474,11 @@ textarea#iesText {
               <select id="fV"><option value="1">1°</option><option value="2">2°</option><option value="2.5">2.5°</option><option value="5">5°</option></select></label>
             <label class="field"><span>Horizontal step</span>
               <select id="fH"><option value="1">1°</option><option value="2.5">2.5°</option><option value="5">5°</option><option value="10">10°</option><option value="15">15°</option><option value="22.5">22.5°</option><option value="30">30°</option></select></label>
+          </div>
+          <div class="row" style="gap:8px">
+            <button class="btn primary" id="btnZip" type="button" hidden>Save .zip</button>
+            <button class="btn" id="btnTxt" type="button" hidden>Save .txt</button>
+            <button class="btn" id="btnCopy" type="button">Copy file</button>
           </div>
         </div>
       </details>
@@ -1337,7 +1335,7 @@ function makeZip(filename, text, date) {
     });
   }
   function renderPresets() {
-    const host = $('presetRow'); host.textContent = '';
+    const host = $('presetRow'); if (!host) return; host.textContent = '';
     PRESETS.forEach(p => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.textContent = p.name; b.setAttribute('aria-pressed', String(S.preset === p.id));
@@ -3168,7 +3166,7 @@ void main() {
   renderLayers();
   if (window.matchMedia && window.matchMedia('(max-width: 700px)').matches) { $('genDet').open = false; $('expDet').open = false; }
   syncAll(); queue();
-  say('Pick a starting point, then drag the points on the curve. Everything updates live.');
+  say('Drag the points on the curve. New starting curves are under + Add layer.');
   (async () => {
     try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
     $('btnZip').hidden = !dl; $('btnTxt').hidden = !dl;

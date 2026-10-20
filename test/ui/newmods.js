@@ -3,7 +3,6 @@ module.exports = async (page, name) => {
   const fx = () => page.$$eval('#layerList .fxname', e => e.map(x => x.textContent).join(' | '));
   const shot = async n => { const f = await (await page.$('#floorCv')).boundingBox(), w = await (await page.$('#wallCv')).boundingBox(); await page.screenshot({ path: 'test/shots/NM-' + n + '.png', clip: { x: f.x, y: f.y, width: w.x + w.width - f.x, height: f.height } }); };
   const clearMods = async () => { while (await page.$('#modList .mhead button[title=Remove]')) { await page.click('#modList .mhead button[title=Remove]'); await page.waitForTimeout(60); } };
-  await page.click('#presetRow >> text="Spot 30°"'); await page.waitForTimeout(150);
   await page.$eval('#floorH', el => { el.value = '2.5'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   for (const t of ['tilt', 'doors', 'gobo', 'shapes']) {
     await clearMods(); await page.selectOption('#modAdd', t); await page.waitForTimeout(400);
