@@ -9,7 +9,7 @@ const path = require('path');
   const html = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>' + raw + '</body></html>';
   const tmp = path.join(require('os').tmpdir(), 'ies-render.html');
   require('fs').writeFileSync(tmp, html);
-  const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || undefined, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
   const errs = [];
   for (const [name, vp, scheme] of [['desk-light', { width: 1360, height: 1000 }, 'light'], ['desk-dark', { width: 1360, height: 1000 }, 'dark'], ['phone', { width: 400, height: 860 }, 'light']]) {
     const ctx = await browser.newContext({ viewport: vp, colorScheme: scheme, deviceScaleFactor: 1 });

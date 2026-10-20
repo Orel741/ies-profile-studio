@@ -1126,6 +1126,8 @@
     const X = x / y, Z = (1 - x - y) / y;
     return [Math.max(0, 3.2406 * X - 1.5372 - 0.4986 * Z), Math.max(0, -0.9689 * X + 1.8758 + 0.0415 * Z), Math.max(0, 0.0557 * X - 0.2040 + 1.0570 * Z)];
   }
+  // the Kelvin colour at full brightness, in display values, for the fixture's glow in the 3D view
+  function lampColor() { const c = kelvinRGB(S.kelvin), m = Math.max(c[0], c[1], c[2]) || 1; return c.map(v => Math.pow(clamp(v / m, 0, 1), 1 / 2.2)); }
   // linear light -> display value: ACES filmic curve (Narkowicz fit), then the sRGB transfer curve, as a lookup table
   const TM_MAX = 16, TM_N = 4096;
   const TONE = (() => {
@@ -1584,7 +1586,7 @@
 precision highp float;
 uniform sampler2D uI; uniform sampler2D uLut;
 uniform vec2 uRes; uniform vec3 uCam, uFwd, uRight, uUp; uniform float uTan;
-uniform float uH, uD, uWall, uExtX, uExtZ, uWallH, uK, uAmb, uLit, uGrid, uCeil; uniform vec3 uCol, uBg;
+uniform float uH, uD, uWall, uExtX, uExtZ, uWallH, uK, uAmb, uLit, uGrid, uCeil; uniform vec3 uCol, uBg, uLamp;
 out vec4 o;
 float I(vec3 v) {
   float r = length(v);
@@ -1628,7 +1630,11 @@ void main() {
   }
   // the fixture itself
   vec3 toL = L - uCam; float tl = dot(toL, dir);
-  if (tl > 0.0 && tl < t + 1e-3) { float ang = length(cross(dir, toL)) / length(toL); c += vec3(1.0, 0.86, 0.55) * exp(-pow(ang / 0.012, 2.0)); }
+  // a glow in the light's colour temperature with a small near-white hot core
+  if (tl > 0.0 && tl < t + 1e-3) {
+    float ang = length(cross(dir, toL)) / length(toL);
+    c += uLamp * exp(-pow(ang / 0.016, 2.0)) + mix(uLamp, vec3(1.0), 0.6) * 0.6 * exp(-pow(ang / 0.006, 2.0));
+  }
   o = vec4(c, 1.0);
 }`;
   function v3Init() {
@@ -1644,7 +1650,7 @@ void main() {
     gl.useProgram(V3.prog);
     const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(V3.prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    ['uI', 'uLut', 'uRes', 'uCam', 'uFwd', 'uRight', 'uUp', 'uTan', 'uH', 'uD', 'uWall', 'uExtX', 'uExtZ', 'uWallH', 'uK', 'uAmb', 'uLit', 'uGrid', 'uCol', 'uBg', 'uCeil'].forEach(n => { V3.U[n] = gl.getUniformLocation(V3.prog, n); });
+    ['uI', 'uLut', 'uRes', 'uCam', 'uFwd', 'uRight', 'uUp', 'uTan', 'uH', 'uD', 'uWall', 'uExtX', 'uExtZ', 'uWallH', 'uK', 'uAmb', 'uLit', 'uGrid', 'uCol', 'uBg', 'uCeil', 'uLamp'].forEach(n => { V3.U[n] = gl.getUniformLocation(V3.prog, n); });
     V3.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, V3.tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -1730,7 +1736,7 @@ void main() {
     gl.uniform1f(U.uH, sc.H); gl.uniform1f(U.uD, sc.D); gl.uniform1f(U.uWall, S.wallC); gl.uniform1f(U.uExtX, sc.ext); gl.uniform1f(U.uExtZ, sc.extZ); gl.uniform1f(U.uWallH, sc.wallH); gl.uniform1f(U.uCeil, sc.ceil ? 1 : 0);
     const lit = S.pvLook === 'lit';
     gl.uniform1f(U.uLit, lit ? 1 : 0); gl.uniform1f(U.uK, lit ? 8 * Math.pow(2, S.ev) / emax : 1 / emax);
-    gl.uniform1f(U.uAmb, S.amb * 0.3); gl.uniform3fv(U.uCol, kelvinRGB(S.kelvin)); gl.uniform1f(U.uGrid, sc.grid);
+    gl.uniform1f(U.uAmb, S.amb * 0.3); gl.uniform3fv(U.uCol, kelvinRGB(S.kelvin)); gl.uniform3fv(U.uLamp, lampColor()); gl.uniform1f(U.uGrid, sc.grid);
     gl.uniform3fv(U.uBg, document.documentElement.matches(':root[data-theme="dark"]') || (matchMedia('(prefers-color-scheme: dark)').matches && !document.documentElement.matches(':root[data-theme="light"]')) ? [0.02, 0.03, 0.045] : [0.06, 0.07, 0.09]);
     if (!v3Cost) v3Calibrate(gl);
     if (cv.width !== W || cv.height !== Hh) { cv.width = W; cv.height = Hh; }
