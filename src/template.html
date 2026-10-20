@@ -1,0 +1,505 @@
+<title>IES Profile Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: preset strip on top, then a narrow settings column beside a wide working column
+   (curve editor with its point inspector, polar + floor/wall previews, readouts, file text).
+   The settings column moves below the work on phones. */
+:root {
+  --bg: #e9edf2;
+  --surface: #f7f9fb;
+  --surface-2: #e0e6ed;
+  --ink: #121a25;
+  --ink-2: #4a586a;
+  --line: #c7d0db;
+  --accent: #f2b51f;
+  --accent-ink: #1b1403;
+  --focus: #1f6feb;
+  --plot: #ffffff;
+  --grid: #dbe2ea;
+  --grid-strong: #b5c0cd;
+  --tick: #566578;
+  --c0: #0b63a8;
+  --c1: #c4580a;
+  --c2: #0a8a63;
+  --c3: #a8467f;
+  --ghost: #6b3fd0;
+  --err: #b42318;
+  --warn-bg: #fff3d1;
+  --warn-ink: #5c3d00;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c121a; --surface: #131b25; --surface-2: #1c2733; --ink: #e7ecf2; --ink-2: #9aa8b8; --line: #2a3745;
+    --accent: #f4c03f; --accent-ink: #1b1403; --focus: #6aa6ff; --plot: #0a1018; --grid: #1a2430; --grid-strong: #2c3a4a;
+    --tick: #8798aa; --c0: #52a9ee; --c1: #f0914a; --c2: #35c795; --c3: #e08fc0; --ghost: #b79bff; --err: #ff8a7a;
+    --warn-bg: #2d2511; --warn-ink: #f6d27a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c121a; --surface: #131b25; --surface-2: #1c2733; --ink: #e7ecf2; --ink-2: #9aa8b8; --line: #2a3745;
+  --accent: #f4c03f; --accent-ink: #1b1403; --focus: #6aa6ff; --plot: #0a1018; --grid: #1a2430; --grid-strong: #2c3a4a;
+  --tick: #8798aa; --c0: #52a9ee; --c1: #f0914a; --c2: #35c795; --c3: #e08fc0; --ghost: #b79bff; --err: #ff8a7a;
+  --warn-bg: #2d2511; --warn-ink: #f6d27a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--bg); color: var(--ink); font: 400 14px/1.45 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px 40px;
+}
+.app { max-width: 1760px; margin: 0 auto; display: grid; gap: 16px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+h1, h2 { margin: 0; font-family: var(--f-display); }
+h1 { font-size: 26px; line-height: 1.1; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 15px; font-weight: 600; }
+.sub { margin: 4px 0 0; color: var(--ink-2); max-width: 60ch; }
+.eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; min-width: 64px; }
+.mono, .num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); }
+
+/* top bar */
+.bar { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: flex-end; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 7px 12px; min-height: 36px;
+  font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.btn:hover { border-color: var(--grid-strong); background: var(--surface-2); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { filter: brightness(1.05); background: var(--accent); }
+.btn.small { min-height: 30px; padding: 4px 10px; font-size: 13px; }
+.btn.icon { min-width: 30px; padding: 4px 6px; font-family: var(--f-mono); }
+#status { margin: 0; min-height: 20px; color: var(--ink-2); font-size: 13px; }
+#status[data-kind="err"] { color: var(--err); }
+
+/* presets */
+.presets { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 12px; font-size: 13px; font-weight: 500; }
+.chip:hover { background: var(--surface-2); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* layout */
+.layout { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "work" "d3" "ctl"; }
+.work { grid-area: work; } .controls { grid-area: ctl; } .view3d { grid-area: d3; }
+.work, .controls, .view3d { display: grid; gap: 16px; min-width: 0; align-content: start; }
+@media (min-width: 1040px) {
+  .layout { grid-template-columns: 320px minmax(0, 1fr); grid-template-areas: "ctl work" "ctl d3"; align-items: start; }
+}
+@media (min-width: 1500px) {
+  .layout { grid-template-columns: 300px minmax(0, 1fr) minmax(360px, 30%); grid-template-areas: "ctl work d3"; }
+  .view3d { position: sticky; top: 16px; }
+}
+#d3Cv { aspect-ratio: 1 / 1.05; height: auto; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #0b0f16; touch-action: none; cursor: grab; }
+@media (min-width: 1040px) and (max-width: 1499px) { #d3Cv { aspect-ratio: 16 / 9; } }
+.card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.card > summary::-webkit-details-marker { display: none; }
+.card > summary::after { content: "+"; font-family: var(--f-mono); color: var(--ink-2); }
+.card[open] > summary::after { content: "–"; }
+.card[open] > summary { margin-bottom: 12px; }
+.head { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.stack { display: grid; gap: 12px; }
+.toolbar { display: grid; gap: 8px; }
+.toolbar .row { gap: 8px 10px; }
+.spacer { flex: 1 1 auto; }
+
+/* segmented / tabs */
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button, .tab {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 10px; min-height: 32px; font-weight: 500; font-size: 13px;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.seg button:hover, .tab:hover { background: var(--surface-2); }
+.seg button[aria-pressed="true"], .tab[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.seg button kbd { border: 0; padding: 0; background: none; opacity: 0.55; font-size: 10px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--dot, var(--ink)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bg) 70%, transparent); }
+
+/* fields */
+.field { display: grid; gap: 4px; }
+.field > span, .field > label { font-size: 12px; color: var(--ink-2); font-weight: 500; }
+.field .line { display: flex; align-items: center; gap: 10px; }
+.field output { font-family: var(--f-mono); font-size: 12px; min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.field output.wide { min-width: 96px; }
+input[type="range"] { width: 100%; accent-color: var(--ink); min-width: 0; }
+input[type="text"], input[type="number"], select {
+  width: 100%; min-height: 36px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--plot);
+}
+input[type="number"] { font-family: var(--f-mono); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check input { width: 16px; height: 16px; accent-color: var(--ink); }
+.hint { font-size: 12.5px; color: var(--ink-2); margin: 0; }
+#brushWrap, #smoothWrap { display: flex; align-items: center; gap: 8px; min-width: 180px; flex: 0 1 260px; font-size: 12px; color: var(--ink-2); }
+
+/* editor */
+canvas { display: block; width: 100%; border-radius: 8px; }
+#edCv { height: 340px; background: var(--plot); border: 1px solid var(--line); touch-action: none; cursor: crosshair; }
+@media (max-width: 560px) { #edCv { height: 280px; } }
+.inspector { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; min-height: 36px; }
+.inspector .mini { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.inspector .mini input { width: 84px; min-height: 30px; padding: 3px 7px; }
+.inspector .pidx { font-family: var(--f-mono); font-size: 12px; min-width: 92px; text-align: center; font-variant-numeric: tabular-nums; }
+.inspector .cd { font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.warn {
+  display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; padding: 8px 12px;
+  border-radius: 8px; background: var(--warn-bg); color: var(--warn-ink); font-size: 13px;
+}
+.warn .btn { border-color: color-mix(in srgb, var(--warn-ink) 35%, transparent); background: transparent; color: var(--warn-ink); }
+.ops { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.keys { font-size: 12.5px; color: var(--ink-2); margin-top: 12px; }
+.keys summary { cursor: pointer; width: max-content; }
+.keys ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+/* layers */
+.addsel { width: auto; min-height: 32px; padding: 4px 8px; font-size: 13px; font-weight: 500; background: var(--surface); }
+ul.layers { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.lyr { padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--plot); }
+.lrow { display: flex; align-items: center; gap: 6px; }
+.fxlist { list-style: none; margin: 0 0 2px; padding: 0 0 0 22px; display: grid; gap: 0; }
+.fx { display: flex; align-items: center; gap: 6px; min-height: 22px; }
+.fx input[type="checkbox"] { width: 13px !important; height: 13px !important; }
+.fxname { border: 0; background: none; padding: 1px 4px; border-radius: 4px; font: 400 11.5px var(--f-body); color: var(--ink-2); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+.fxname::before { content: "ƒ"; font-style: italic; font-family: var(--f-mono); margin-right: 6px; opacity: 0.7; }
+.fxname:hover { color: var(--ink); background: var(--surface-2); }
+.fx.off .fxname { text-decoration: line-through; opacity: 0.55; }
+.mod.flash { animation: modflash 0.9s ease-out; }
+@keyframes modflash { from { box-shadow: 0 0 0 3px var(--accent); } to { box-shadow: 0 0 0 0 transparent; } }
+.lyr.sel { border-color: var(--ink); box-shadow: inset 3px 0 0 var(--accent); }
+.lyr.off .lname, .lyr.off .fxlist { opacity: 0.5; }
+.lyr input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--ink); flex: none; }
+.lname { flex: 1 1 auto; min-width: 0; display: grid; text-align: left; border: 0; background: none; padding: 2px 4px; border-radius: 6px; }
+.lname .n { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lname .t { font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lyr .btn.icon { min-height: 26px; min-width: 26px; padding: 2px 4px; font-size: 12px; }
+.lprops { border-top: 1px solid var(--line); padding-top: 12px; }
+.mod { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: var(--plot); }
+.mod.off > :not(.mhead) { opacity: 0.5; }
+.gobo { gap: 8px; align-items: center; } .gthumb { width: 48px; height: 48px; border-radius: 6px; border: 1px solid var(--line); image-rendering: auto; }
+.mod .seg button { padding: 4px 9px; font-size: 12px; }
+.mhead { display: flex; align-items: center; gap: 6px; cursor: grab; }
+.grip { flex: none; width: 14px; align-self: stretch; min-height: 22px; border: 0; padding: 0; border-radius: 4px; cursor: grab; touch-action: none; opacity: 0.45;
+  background: radial-gradient(circle, var(--ink-2) 1.1px, transparent 1.4px) 0 0 / 5px 5px; background-clip: content-box; padding: 4px 2px; margin-left: -2px; }
+.grip:hover, .grip:focus-visible { opacity: 1; }
+.fx .grip { min-height: 16px; width: 11px; padding: 3px 1px; }
+.lrow, .fx { cursor: grab; }
+.sorting, .sorting * { cursor: grabbing !important; user-select: none; }
+.sorting > :not(.dragging) { transition: transform 0.15s ease; }
+.dragging { position: relative; z-index: 5; box-shadow: 0 6px 18px rgb(0 0 0 / 0.28); background: var(--surface); border-radius: 8px; opacity: 0.96; }
+.mhead input { width: 16px; height: 16px; accent-color: var(--ink); }
+.mhead .btn.icon { min-height: 26px; min-width: 26px; padding: 2px 4px; font-size: 12px; }
+
+/* preview look */
+.kswatch { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); flex: none; box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--plot) 60%, transparent); }
+.knum { width: 92px !important; flex: none; }
+#kPre button { font-size: 12px; min-height: 28px; padding: 3px 8px; }
+
+/* info buttons and popovers */
+.ipos { position: relative; }
+.tip { position: fixed; z-index: 100; max-width: min(380px, calc(100vw - 24px)); display: grid; gap: 6px; pointer-events: none;
+  background: var(--surface); border: 1px solid var(--grid-strong); border-radius: 10px; padding: 10px 12px; font: 400 12.5px/1.45 var(--f-body); color: var(--ink-2);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); opacity: 0; transform: translateY(3px); transition: opacity 0.12s, transform 0.12s; }
+.tip.show { opacity: 1; transform: none; }
+.tip p { margin: 0; } .tip ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; } .tip [hidden] { display: none; }
+h2[data-tip], .mhead strong[data-tip], label[data-tip], p.note[data-tip] { text-decoration: underline dotted color-mix(in srgb, var(--ink-2) 45%, transparent); text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: help; }
+.info { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 600 11px/1 var(--f-body); font-style: italic; display: inline-flex; align-items: center; justify-content: center; padding: 0; margin-left: 6px; vertical-align: 2px; cursor: pointer; flex: none; }
+.info:hover { border-color: var(--grid-strong); color: var(--ink); }
+.info[aria-expanded="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.infopop { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; min-width: min(260px, 100%); max-width: 520px; display: grid; gap: 6px;
+  background: var(--surface); border: 1px solid var(--grid-strong); border-radius: 10px; padding: 10px 12px; font: 400 12.5px/1.45 var(--f-body); color: var(--ink-2); box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); text-transform: none; letter-spacing: 0; }
+.infopop p { margin: 0; }
+.infopop ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; }
+.lchip { font: 500 12px var(--f-body); color: var(--ink-2); margin-left: 8px; }
+.pvctl { margin-top: 8px; }
+.hrow { gap: 6px 10px; min-height: 36px; }
+.hrow .check { margin-left: auto; }
+
+/* previews */
+.views, .duo { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 720px) { .views, .duo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.duo > .card { height: 100%; }
+#polarCv { aspect-ratio: 1 / 1; height: auto; background: var(--plot); border: 1px solid var(--line); }
+canvas.heat { aspect-ratio: 1 / 1; height: auto; background: #05070b; border: 1px solid var(--line); cursor: crosshair; }
+.hover { font-family: var(--f-mono); font-size: 12px; color: var(--ink-2); min-height: 18px; margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+/* readouts */
+.readouts { display: grid; gap: 10px 18px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 0; }
+.readouts div { display: grid; gap: 2px; align-content: start; }
+.readouts dt { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.readouts dd { margin: 0; font-family: var(--f-mono); font-size: 16px; font-variant-numeric: tabular-nums; }
+.readouts dd small { font-size: 11px; color: var(--ink-2); }
+
+textarea#iesText {
+  width: 100%; min-height: 220px; resize: vertical; font-family: var(--f-mono); font-size: 12px; line-height: 1.5;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--plot); padding: 10px; white-space: pre; overflow: auto;
+}
+.note { font-size: 12.5px; color: var(--ink-2); margin: 10px 0 0; max-width: 78ch; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div>
+      <h1>IES Profile Studio</h1>
+      <p class="sub">Shape a light, preview it, export an IES file for Unreal.</p>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnImport" type="button">Import .ies</button>
+      <input id="fileIn" class="vh" type="file" accept=".ies,.IES,.txt" tabindex="-1" aria-label="Choose an IES file to import">
+      <button class="btn" id="btnCopy" type="button">Copy file</button>
+      <button class="btn primary" id="btnZip" type="button" hidden>Save .zip</button>
+      <button class="btn" id="btnTxt" type="button" hidden>Save .txt</button>
+    </div>
+  </header>
+  <p id="status" role="status" aria-live="polite"></p>
+
+  <section class="presets" aria-label="Starting points">
+    <span class="eyebrow">Start from</span>
+    <div class="chips" id="presetRow"></div>
+  </section>
+
+  <div class="layout">
+    <section class="work">
+      <article class="card" aria-label="Distribution editor">
+        <div class="head ipos">
+          <h2>Light curve<span class="lchip" id="edLayerName"></span></h2>
+          <div class="infopop" id="edInfo" hidden>
+            <p>Brightness (up) against the angle from straight down (0°) to straight up (180°), for the direction you are editing.</p>
+            <p id="symDesc"></p>
+            <p id="toolHint"></p>
+            <p id="edLegend" hidden>Dotted grey line: all layers and modifiers combined in this direction.</p>
+            <ul>
+              <li><kbd>P</kbd> <kbd>D</kbd> <kbd>U</kbd> <kbd>S</kbd> Points, Draw, Push, Smooth · <kbd>1</kbd>–<kbd>4</kbd> direction</li>
+              <li><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> nudge point (<kbd>Shift</kbd> bigger) · <kbd>,</kbd> <kbd>.</kbd> previous / next</li>
+              <li><kbd>Delete</kbd> remove · <kbd>Esc</kbd> deselect · <kbd>Shift</kbd>+drag one axis or flat</li>
+              <li><kbd>[</kbd> <kbd>]</kbd> brush size · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
+            </ul>
+          </div>
+          <div class="row">
+            <button class="btn small" id="btnUndo" type="button" disabled title="Undo (Ctrl+Z)">Undo</button>
+            <button class="btn small" id="btnRedo" type="button" disabled title="Redo (Ctrl+Shift+Z)">Redo</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <div class="row"><span class="eyebrow">Shape</span><div class="seg" id="symRow"></div></div>
+          <div class="row"><span class="eyebrow">Editing</span><div class="seg" id="tabRow"></div></div>
+          <div class="row">
+            <span class="eyebrow">Tool</span>
+            <div class="seg" id="toolRow"></div>
+            <label id="brushWrap"><span>Brush</span><input id="brush" type="range" min="1" max="30" step="1" value="6" aria-label="Brush radius"><output id="brushVal" class="mono">6°</output></label>
+            <label id="smoothWrap" class="bw" hidden><span>Strength</span><input id="smoothStr" type="range" min="0.02" max="1" step="0.01" value="0.6" aria-label="Smoothing strength"><output id="smoothStrVal" class="mono">60%</output></label>
+          </div>
+          <div class="row">
+            <span class="eyebrow">View</span>
+            <div class="seg" id="rangeSeg" aria-label="Angle range"></div>
+            <div class="seg" id="yScaleSeg" aria-label="Intensity scale"></div>
+          </div>
+        </div>
+        <canvas id="edCv" tabindex="0" style="margin-top:12px" role="img" aria-label="Curve editor for the selected direction: intensity from 0 degrees, straight down, to 180 degrees, straight up. Click to add points and drag them, or paint with the brush tools. Arrow keys move the selected point."></canvas>
+
+        <div class="inspector" id="insp">
+          <div class="row" id="inspPts" hidden>
+            <button class="btn small icon" id="kPrev" type="button" aria-label="Select previous point" title="Previous point ( , )">‹</button>
+            <span class="pidx" id="kIdx">Point 1 of 2</span>
+            <button class="btn small icon" id="kNext" type="button" aria-label="Select next point" title="Next point ( . )">›</button>
+            <label class="mini">Angle <input id="kDeg" type="number" min="0" max="180" step="1" inputmode="decimal"> °</label>
+            <label class="mini">Intensity <input id="kVal" type="number" min="0" max="100" step="0.1" inputmode="decimal"> %</label>
+            <span class="cd" id="kCd"></span>
+            <button class="btn small" id="kDel" type="button">Remove point</button>
+          </div>
+        </div>
+
+        <div class="warn" id="warn" hidden>
+          <span id="warnText"></span>
+          <button class="btn small" id="warnFix" type="button">Make them match</button>
+        </div>
+
+        <div class="ops">
+          <button class="btn small" id="btnSmooth" type="button" title="Soften bumps in this curve">Smooth</button>
+          <button class="btn small" id="btnMirror" type="button" title="Copy the lower hemisphere onto the upper one">Mirror up</button>
+          <button class="btn small" id="btnZero" type="button" title="Remove all light above the horizon">Zero above 90°</button>
+          <button class="btn small" id="btnAll" type="button" title="Use this curve for every direction">Copy to all directions</button>
+          <button class="btn small" id="btnSimplify" type="button" title="Refit this curve with fewer points">Fewer points</button>
+        </div>
+
+      </article>
+
+      <article class="card" id="lookCard" aria-label="Preview look">
+        <div class="row ipos" style="gap:10px 16px">
+          <h2>Preview look</h2>
+          <div class="seg" id="lookSeg"></div>
+          <div class="infopop" id="lookInfo" hidden><p id="lookHint"></p></div>
+        </div>
+        <div class="stack" id="litCtl" style="margin-top:12px" hidden>
+          <div class="row" style="gap:8px 14px; align-items:center">
+            <span class="kswatch" id="kSw" aria-hidden="true"></span>
+            <label class="field" style="flex:1 1 240px; min-width:0"><span>Colour temperature</span><span class="line"><input id="kelvin" type="range" min="1000" max="12000" step="50" aria-label="Colour temperature in kelvin"><input id="kelvinNum" class="knum" type="number" min="1000" max="20000" step="50" inputmode="numeric" aria-label="Colour temperature in kelvin, exact"><span class="mono" style="font-size:12px">K</span></span></label>
+          </div>
+          <div class="seg" id="kPre" aria-label="Common colour temperatures"></div>
+          <div class="two">
+            <label class="field"><span>Exposure</span><span class="line"><input id="ev" type="range" min="-4" max="4" step="0.1"><output id="evVal">0.0 EV</output></span></label>
+            <label class="field"><span>Room light</span><span class="line"><input id="amb" type="range" min="0" max="1" step="0.01"><output id="ambVal">15%</output></span></label>
+          </div>
+        </div>
+      </article>
+
+      <div class="views">
+        <article class="card" aria-label="Floor preview">
+          <div class="head ipos"><h2><span id="floorTitle">Floor</span></h2><span class="hint" id="floorSub">From above</span>
+            <div class="infopop" id="floorInfo" hidden><p id="floorHint"></p><p>Front is at the top. Hover the map for lux.</p></div>
+          </div>
+          <canvas id="floorCv" class="heat" role="img" aria-label="Map of illuminance on the floor below the fixture or the ceiling above it, with draggable curve points"></canvas>
+          <p class="hover" id="floorHover"> </p>
+          <div class="stack pvctl">
+            <div class="field"><span>Surface</span><div class="seg" id="surfSeg"></div></div>
+            <div class="row hrow"><span class="hint">Handles</span><div class="seg" id="hmodeF"></div><label class="check" title="Split brightness into 10% bands"><input id="bandsChk" type="checkbox"> Isolux</label></div>
+            <label class="field"><span>Mounting height</span><span class="line"><input id="floorH" type="range" min="0.5" max="12" step="0.1" value="3"><output id="floorHVal">3.0 m</output></span></label>
+            <label class="field" id="ceilWrap" hidden><span>Ceiling above the fixture</span><span class="line"><input id="ceilD" type="range" min="0.1" max="8" step="0.1" value="1.2"><output id="ceilDVal">1.2 m</output></span></label>
+            <div class="field"><span class="line" style="justify-content:space-between"><span>View half-width</span><label class="check" style="font-size:12px"><input id="fitChk" type="checkbox" checked> Auto</label></span><span class="line"><input id="floorR" type="range" min="0.5" max="40" step="0.5" value="6" aria-label="View half-width"><output id="floorRVal" class="wide">6 m</output></span></div>
+          </div>
+        </article>
+        <article class="card" aria-label="Wall preview">
+          <div class="head ipos"><h2>Wall</h2><span class="hint">Facing the wall</span>
+            <div class="infopop" id="wallInfo" hidden><p id="wallHint"></p><p>Hover the map for lux.</p></div>
+          </div>
+          <canvas id="wallCv" class="heat" role="img" aria-label="Map of illuminance on a wall beside the fixture, with draggable curve points for the side of the light facing it"></canvas>
+          <p class="hover" id="wallHover"> </p>
+          <div class="stack pvctl">
+            <div class="field"><span>Wall side</span><div class="seg" id="wallSeg"></div></div>
+            <div class="row hrow"><span class="hint">Handles</span><div class="seg" id="hmodeW"></div><label class="check" title="Split brightness into 10% bands"><input id="bandsChkW" type="checkbox"> Isolux</label></div>
+            <label class="field"><span>Distance from wall</span><span class="line"><input id="wallD" type="range" min="0.1" max="5" step="0.05" value="0.6"><output id="wallDVal">0.60 m</output></span></label>
+          </div>
+        </article>
+      </div>
+
+      <div class="duo">
+        <article class="card" aria-label="Polar diagram">
+          <div class="head ipos"><h2>Polar diagram</h2>
+            <div class="infopop" id="polarInfo" hidden><p>The light's shape, all layers combined. Solid: seen from the side, Front on the right. Dashed: seen from the front, Right on the right. Straight down is at the bottom; rings are in candela.</p></div>
+          </div>
+          <canvas id="polarCv" role="img" aria-label="Side and front views of the light distribution, with intensity in candela"></canvas>
+          <p class="hover" id="polarHover"> </p>
+          <div class="legend" id="polarLegend"></div>
+        </article>
+        <article class="card" aria-label="Photometric readouts">
+          <div class="head ipos"><h2>Photometry</h2>
+            <div class="infopop" id="photoInfo" hidden><p>Beam is where the light falls to half brightness, field to 10%; both read front-to-back × side-to-side. Upward light is the share of output above the horizon.</p></div>
+          </div>
+          <dl class="readouts">
+            <div><dt>Peak intensity</dt><dd id="rdPeak">–</dd></div>
+            <div><dt>Total flux</dt><dd id="rdFlux">–</dd></div>
+            <div><dt>Beam angle (50%)</dt><dd id="rdBeam">–</dd></div>
+            <div><dt>Field angle (10%)</dt><dd id="rdField">–</dd></div>
+            <div><dt>Floor lux below</dt><dd id="rdCenter">–</dd></div>
+            <div><dt>Beam footprint</dt><dd id="rdFoot">–</dd></div>
+            <div><dt>Upward light</dt><dd id="rdUp">–</dd></div>
+          </dl>
+        </article>
+      </div>
+
+      <details class="card" id="fileDet">
+        <summary><h2>IES file text <span class="mono" id="fileMeta" style="font-weight:400;color:var(--ink-2);font-size:12px"></span></h2></summary>
+        <textarea id="iesText" readonly spellcheck="false" aria-label="Generated IES file"></textarea>
+        <p class="note ipos">In Unreal, drag the .ies into the Content Browser and assign it to a light's IES Texture.
+          <span class="infopop" id="ueInfo" hidden><span>Unpack the .zip first, or rename the .txt to end in .ies. Straight down here is the light's forward direction in Unreal. Recent UE5 versions use Front, Left, Back and Right separately (C0, C90, C180, C270 in the file); older ones use one curve. Use the Orientation test preset to see which way Front faces.</span></span></p>
+      </details>
+    </section>
+
+    <aside class="controls">
+      <article class="card" id="layersCard" aria-label="Layers">
+        <div class="head ipos"><h2>Layers</h2>
+          <div class="infopop" id="layInfo" hidden><p>Layers stack bottom to top and combine into the exported light. The curve editor and the preview handles shape the selected layer.</p><p id="lySrc"></p></div>
+          <select id="layerAdd" class="addsel" aria-label="Add a layer"><option value="">+ Add layer</option><option value="dup">Duplicate this layer</option><option value="file">Import .ies file as a layer</option></select>
+        </div>
+        <ul class="layers" id="layerList"></ul>
+        <div class="stack lprops">
+          <label class="field"><span>Name</span><input id="lyName" type="text" maxlength="40" autocomplete="off"></label>
+          <div class="field ipos"><label for="lyBlend">Blend</label><select id="lyBlend"></select>
+            <div class="infopop" id="blendInfo" hidden><p id="lyBlendHint"></p><p>Add: like a second bulb. Lighten: the brighter wins. Replace: paints over. Mask: a stencil for the layers below. Subtract: removes light.</p></div></div>
+          <label class="field"><span>Strength</span><span class="line"><input id="lyAmt" type="range" min="0" max="2" step="0.01"><output id="lyAmtVal">100%</output></span></label>
+          <label class="field"><span>Turn</span><span class="line"><input id="lyTurn" type="range" min="0" max="359" step="1"><output id="lyTurnVal">0°</output></span></label>
+          <button class="btn small" id="lyToCurve" type="button" hidden>Edit as curve</button>
+        </div>
+        <div class="mods">
+          <div class="head" style="margin:14px 0 8px"><h2 style="font-size:14px">Modifiers</h2>
+            <select id="modAdd" class="addsel" aria-label="Add a modifier"><option value="">+ Add modifier</option></select>
+          </div>
+          <div class="stack" id="modList"></div>
+        </div>
+      </article>
+
+      <details class="card" id="genDet" open>
+        <summary class="ipos"><h2>Curve generator</h2><span class="infopop" id="genInfo" hidden><span>Builds a curve from a few settings. The dashed violet line in the editor previews it before you apply.</span></span></summary>
+        <div class="stack">
+          <div class="seg" id="genType"></div>
+          <div class="stack" id="genFields"></div>
+          <div class="row">
+            <button class="btn small" id="genApply" type="button">Apply</button>
+            <button class="btn small" id="genAll" type="button">Apply to all directions</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="card" open>
+        <summary><h2>Intensity scale</h2></summary>
+        <div class="stack">
+          <div class="seg" id="scaleSeg"></div>
+          <label class="field"><span id="scaleLabel">Peak intensity (cd)</span><input id="scaleIn" type="number" inputmode="decimal" min="0.01" step="any"></label>
+          <p class="hint" id="scaleHint"></p>
+        </div>
+      </details>
+
+      <details class="card" id="expDet" open>
+        <summary class="ipos"><h2>File settings</h2><span class="infopop" id="fileInfo" hidden><span>Candela values are written with a multiplier of 1. Use Absolute (−1) if your importer rescales by the lumen figure. With noise, rays, a turn or an imported file the file uses at most 2.5° horizontal steps; pick 1° for the finest detail.</span></span></summary>
+        <div class="stack">
+          <label class="field"><span>Profile name</span><input id="fName" type="text" maxlength="60" autocomplete="off"></label>
+          <label class="field"><span>Manufacturer</span><input id="fManu" type="text" maxlength="60" autocomplete="off" placeholder="optional"></label>
+          <div class="two">
+            <label class="field"><span>Input watts</span><input id="fWatts" type="number" inputmode="decimal" min="0" step="any"></label>
+            <label class="field"><span>Header lumens</span>
+              <select id="fLum"><option value="flux">Computed flux</option><option value="abs">Absolute (−1)</option></select></label>
+          </div>
+          <div class="two">
+            <label class="field"><span>Vertical step</span>
+              <select id="fV"><option value="1">1°</option><option value="2">2°</option><option value="2.5">2.5°</option><option value="5">5°</option></select></label>
+            <label class="field"><span>Horizontal step</span>
+              <select id="fH"><option value="1">1°</option><option value="2.5">2.5°</option><option value="5">5°</option><option value="10">10°</option><option value="15">15°</option><option value="22.5">22.5°</option><option value="30">30°</option></select></label>
+          </div>
+        </div>
+      </details>
+    </aside>
+
+    <aside class="view3d" aria-label="3D view">
+      <article class="card">
+        <div class="head ipos"><h2>3D view</h2><button class="btn small" id="d3Reset" type="button">Reset view</button>
+          <div class="infopop" id="d3InfoPop" hidden><p>Drag to orbit (also below the floor or above the ceiling, where they drop out), scroll or pinch to zoom, double-click to reset. Uses the floor height, wall distance and side, and the preview look. A ceiling appears for upward light.</p></div></div>
+        <canvas id="d3Cv" tabindex="0" role="img" aria-label="3D view of a floor and a back wall lit by the light. Drag to orbit, scroll to zoom, arrow keys also orbit."></canvas>
+        <p class="hint" id="d3Msg" hidden></p>
+        <p class="hover" id="d3Info"> </p>
+      </article>
+    </aside>
+  </div>
+</div>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+
+<script>
+/*__CORE__*/
+/*__UI__*/
+</script>
