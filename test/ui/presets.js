@@ -1,0 +1,1 @@
+module.exports = async (page, name) => { console.log(name, 'row:', await page.$$eval('#presetRow button', b => b.map(x => x.textContent).join(', '))); if (name === 'desk-light') await page.screenshot({ path: require('path').join(__dirname, '../shots/presets.png'), clip: { x: 0, y: 0, width: 1360, height: 200 } }); };

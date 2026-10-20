@@ -164,7 +164,7 @@
   }
   function renderPresets() {
     const host = $('presetRow'); if (!host) return; host.textContent = '';
-    PRESETS.forEach(p => {
+    PRESETS.filter(p => !/^st\d/.test(p.id)).forEach(p => {   // street lights stay under + Add layer
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.textContent = p.name; b.setAttribute('aria-pressed', String(S.preset === p.id));
       b.addEventListener('click', () => applyPreset(p));
@@ -2003,7 +2003,7 @@ void main() {
   renderLayers();
   if (window.matchMedia && window.matchMedia('(max-width: 700px)').matches) { $('genDet').open = false; $('expDet').open = false; }
   syncAll(); queue();
-  say('Drag the points on the curve. New starting curves are under + Add layer.');
+  say('Pick a starting point, then drag the points on the curve. Everything updates live.');
   (async () => {
     try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
     $('btnZip').hidden = !dl; $('btnTxt').hidden = !dl;
