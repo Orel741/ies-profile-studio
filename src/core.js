@@ -260,13 +260,13 @@ const MOD_TYPES = {
   blur: { label: 'Blur', defaults: { vert: 4, around: 8 } },
   cut: { label: 'Cut above angle', defaults: { angle: 90, soft: 4 } },
   contrast: { label: 'Contrast', defaults: { gamma: 1.5 } },
-  tilt: { label: 'Tilt', defaults: { angle: 20, toward: 0 } },
+  transform: { label: 'Transform', defaults: { tilt: 20, rotate: 0, wideF: 1, wideS: 1, mirror: 0 } },
   doors: { label: 'Barn doors', defaults: { front: 20, back: 20, left: 90, right: 90, soft: 3, turn: 0 } },
   gobo: { label: 'Gobo image', defaults: { size: 30, rotate: 0, level: 0, invert: 0, img: '' } },
   shapes: { label: 'Shape array', defaults: { shape: 0, layout: 0, count: 5, size: 0.6, spread: 30, soft: 0.15, rotate: 0, level: 0 } }
 };
 // modifiers that break round symmetry, so the export needs every direction at fine steps
-const FINE_MODS = new Set(['noise', 'rays', 'tilt', 'doors', 'gobo', 'shapes']);
+const FINE_MODS = new Set(['noise', 'rays', 'transform', 'doors', 'gobo', 'shapes']);
 function blur1(arr, n, stride, count, radius, wrap) {
   if (radius < 0.5) return;
   const r = Math.ceil(radius * 2), w = [];
@@ -395,16 +395,27 @@ function shapesMask(M, p) {
     });
   }
 }
-function tiltField(F, p) {
-  const a = -p.angle * DEG, th = p.toward * DEG, kx = -Math.sin(th), ky = Math.cos(th), ca = Math.cos(a), sa = Math.sin(a), src = Float32Array.from(F);
+// Transform, in this order: mirror, widen (front-back and sideways separately), tilt toward Front, then rotate the
+// result around the vertical axis. Each output direction is traced back through the inverse steps to the source.
+function transformField(F, p) {
+  const tl = p.tilt * DEG, ct = Math.cos(tl), st = Math.sin(tl), rot = p.rotate * DEG, cr = Math.cos(rot), sr = Math.sin(rot);
+  const wf = Math.max(0.05, p.wideF), ws = Math.max(0.05, p.wideS), mir = Math.round(p.mirror), src = Float32Array.from(F);
   for (let c = 0; c < NC; c++) {
     const C = c * CSTEP * DEG, cc = Math.cos(C), sc = Math.sin(C);
     for (let g = 0; g < N; g++) {
-      const sg = Math.sin(g * DEG), x = sg * cc, y = sg * sc, z = Math.cos(g * DEG);
-      // rotate the output direction back by the tilt (Rodrigues, axis k = (kx, ky, 0))
-      const kv = kx * x + ky * y, cxv = ky * z, cyv = -kx * z, czv = kx * y - ky * x;
-      const X = x * ca + cxv * sa + kx * kv * (1 - ca), Y = y * ca + cyv * sa + ky * kv * (1 - ca), Z = z * ca + czv * sa;
-      F[c * N + g] = fieldAt(src, Math.acos(clamp(Z, -1, 1)) / DEG, Math.atan2(Y, X) / DEG);
+      const sg = Math.sin(g * DEG);
+      let x = sg * cc, y = sg * sc, z = Math.cos(g * DEG);              // x Front, y Left, z down
+      { const X = x * cr + y * sr, Y = -x * sr + y * cr; x = X; y = Y; }  // undo the rotation
+      { const X = x * ct - z * st, Z = x * st + z * ct; x = X; z = Z; }   // undo the tilt toward Front
+      let gs = Math.acos(clamp(z, -1, 1)) / DEG, cs = Math.atan2(y, x);
+      if (wf !== 1 || ws !== 1) {                                          // undo the widening, in angle-from-down space
+        const ax = gs * Math.cos(cs) / wf, ay = gs * Math.sin(cs) / ws;
+        gs = Math.hypot(ax, ay); cs = Math.atan2(ay, ax);
+        if (gs > 180) { F[c * N + g] = 0; continue; }
+      }
+      let Cs = cs / DEG;
+      if (mir === 1) Cs = -Cs; else if (mir === 2) Cs = 180 - Cs;          // Left↔Right, Front↔Back
+      F[c * N + g] = fieldAt(src, gs, Cs);
     }
   }
 }
@@ -441,7 +452,7 @@ function applyMod(F, m) {
   } else if (m.type === 'contrast') {
     const pk = fieldMax(F) || 1;
     for (let i = 0; i < F.length; i++) F[i] = pk * Math.pow(F[i] / pk, p.gamma);
-  } else if (m.type === 'tilt') { if (p.angle) tiltField(F, p); }
+  } else if (m.type === 'transform') { if (p.tilt || p.rotate || p.wideF !== 1 || p.wideS !== 1 || Math.round(p.mirror)) transformField(F, p); }
 }
 
 /* ---------- layers ---------- */

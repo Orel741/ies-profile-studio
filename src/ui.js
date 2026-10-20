@@ -326,7 +326,8 @@
     blur: [['vert', 'Up and down', 0, 20, 0.5, degF], ['around', 'Around the axis', 0, 45, 0.5, degF]],
     cut: [['angle', 'Cut above', 10, 180, 1, degF], ['soft', 'Softness', 0, 30, 0.5, degF]],
     contrast: [['gamma', 'Contrast', 0.3, 3, 0.05, v => v.toFixed(2) + '×']],
-    tilt: [['angle', 'Tilt', 0, 90, 0.5, degF], ['toward', 'Toward', 0, 359, 1, v => Math.round(v) + '° ' + sideName(v)]],
+    transform: [['tilt', 'Tilt', 0, 90, 0.5, degF], ['rotate', 'Rotation', 0, 359, 1, v => Math.round(v) + '° ' + sideName(v)],
+      ['wideF', 'Width front–back', 0.25, 3, 0.01, pctF], ['wideS', 'Width sideways', 0.25, 3, 0.01, pctF], ['mirror', 'Mirror', 0, 2, 1, null, ['Off', 'Left ↔ Right', 'Front ↔ Back']]],
     doors: [['front', 'Front door', 5, 90, 0.5, doorF], ['back', 'Back door', 5, 90, 0.5, doorF], ['left', 'Left door', 5, 90, 0.5, doorF], ['right', 'Right door', 5, 90, 0.5, doorF], ['soft', 'Softness', 0, 20, 0.5, degF], ['turn', 'Turn doors', 0, 90, 1, degF]],
     gobo: [['size', 'Slide size', 3, 80, 0.5, degF], ['rotate', 'Rotate', 0, 359, 1, degF], ['level', 'Light through dark parts', 0, 1, 0.01, pctF], ['invert', 'Invert', 0, 1, 1, null, ['Off', 'On']]],
     shapes: [['shape', 'Shape', 0, 2, 1, null, ['Circles', 'Squares', 'Diamonds']], ['layout', 'Layout', 0, 1, 1, null, ['Grid', 'Rings']], ['count', 'Count across', 1, 16, 1, intF], ['size', 'Shape size', 0.05, 1, 0.01, pctF],
@@ -341,7 +342,7 @@
     blur: 'Softens detail up and down and around the light.',
     cut: 'Removes light above an angle, like a shield or a dark-sky cutoff.',
     contrast: 'Above 1× makes the hotspot punchier, below 1× flattens it.',
-    tilt: 'Aims the whole light off its axis, toward a side. Front is 0°, Left 90°, Back 180°, Right 270°.',
+    transform: 'Tilt aims the light off its axis toward Front; Rotation then turns it around the vertical (90° aims it Left) without changing the tilt. The widths stretch or squeeze the beam in each direction, and Mirror flips it.',
     doors: 'Four flaps that cut the beam on each side, measured from straight down. 90° is fully open.',
     gobo: 'Projects a picture like a gobo slide: white lets light through, black blocks it. The top of the image faces Front. Without an image it uses a window pattern.',
     shapes: 'Projects a pattern of circles, squares or diamonds, in a grid or in rings, like a dot gobo or an LED array.'
@@ -541,7 +542,9 @@
       : m.type === 'blur' ? 'Blur ' + (+p.vert.toFixed(1)) + '° / ' + (+p.around.toFixed(1)) + '°'
       : m.type === 'cut' ? 'Cut above ' + Math.round(p.angle) + '°'
       : m.type === 'contrast' ? 'Contrast ' + p.gamma.toFixed(2) + '×'
-      : m.type === 'tilt' ? 'Tilt ' + (+p.angle.toFixed(1)) + '° to ' + sideName(p.toward)
+      : m.type === 'transform' ? 'Transform ' + ([p.tilt ? 'tilt ' + (+p.tilt.toFixed(1)) + '°' : '', p.rotate ? 'rotate ' + Math.round(p.rotate) + '°' : '',
+          p.wideF !== 1 || p.wideS !== 1 ? (p.wideF === p.wideS ? 'width ' + pc(p.wideF) : 'width ' + pc(p.wideF) + ' × ' + pc(p.wideS)) : '',
+          ['', 'mirror L↔R', 'mirror F↔B'][Math.round(p.mirror)]].filter(Boolean).join(' · ') || '(none)')
       : m.type === 'doors' ? 'Barn doors ' + (['front', 'back', 'left', 'right'].filter(k => p[k] < 89.95).map(k => k[0].toUpperCase() + ' ' + Math.round(p[k]) + '°').join(' · ') || 'open')
       : m.type === 'gobo' ? 'Gobo ' + (p.img ? 'image' : 'window') + ' · ' + Math.round(p.size) + '°' + (p.invert >= 0.5 ? ' · inverted' : '')
       : m.type === 'shapes' ? ['Circles', 'Squares', 'Diamonds'][Math.round(p.shape)] + (Math.round(p.layout) ? ' in ' + Math.round(p.count) + ' rings' : ' ' + Math.round(p.count) + ' × ' + Math.round(p.count)) + ' · ' + Math.round(p.spread) + '°'
@@ -1877,7 +1880,7 @@ void main() {
           name: String(o.name || 'Layer').slice(0, 40), type: ies ? 'ies' : 'curve', on: o.on !== false, blend: BLENDS[o.blend] ? o.blend : 'add',
           amount: num(o.amount, 1, 0, 2), turn: num(o.turn, 0, 0, 359), mode: o.mode, planes: o.planes.map(a => Float32Array.from(a, v => clamp(v, 0, 1))),
           knots: Array.isArray(o.knots) && o.knots.length === 4 ? o.knots.map(validKnots) : [null, null, null, null], grid: ies ? Float32Array.from(o.grid, v => Math.max(0, v)) : null,
-          mods: Array.isArray(o.mods) ? o.mods.filter(m => m && MOD_TYPES[m.type]).slice(0, 12).map(m => {
+          mods: Array.isArray(o.mods) ? o.mods.map(m => m && m.type === 'tilt' ? { type: 'transform', on: m.on, p: { tilt: m.p && m.p.angle, rotate: m.p && m.p.toward } } : m).filter(m => m && MOD_TYPES[m.type]).slice(0, 12).map(m => {
             const p = {}; (MOD_FIELDS[m.type] || []).forEach(([k, , mn, mx]) => { p[k] = num(m.p && m.p[k], MOD_TYPES[m.type].defaults[k], mn, mx); });
             if (m.type === 'gobo' && m.p && typeof m.p.img === 'string' && m.p.img.length < 60000 && /^\d+:\d+:[A-Za-z0-9+/=]+$/.test(m.p.img)) p.img = m.p.img;
             return { id: modSeq++, type: m.type, on: m.on !== false, p };

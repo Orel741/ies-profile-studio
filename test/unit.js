@@ -131,8 +131,15 @@ for (const mode of ['rot', 'bi', 'mir', 'asym']) {
   }
   { // tilt moves the hotspot toward the chosen side; barn doors cut one side only; a loaded slide is projected Front-up
     const L = Object.assign({}, spot, { planes: [0, 1, 2, 3].map(() => C.genArray({ type: 'beam', beam: 20, field: 40 })) });
-    const T = C.layerField(Object.assign({}, L, { mods: [{ type: 'tilt', on: true, p: { angle: 30, toward: 90 } }] }));
-    assert(C.fieldAt(T, 30, 90) > 0.95 && C.fieldAt(T, 30, 270) < 0.05 && C.fieldAt(T, 0, 0) < 0.1, 'tilt 30° toward Left: peak at 30° Left ' + C.fieldAt(T, 30, 90).toFixed(2));
+    const T = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 30, rotate: 90 } }] }));
+    assert(C.fieldAt(T, 30, 90) > 0.95 && C.fieldAt(T, 30, 270) < 0.05 && C.fieldAt(T, 0, 0) < 0.1, 'transform tilt 30° rotated 90°: peak at 30° Left ' + C.fieldAt(T, 30, 90).toFixed(2));
+    const T0 = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 30, rotate: 0 } }] }));
+    assert(C.fieldAt(T0, 30, 0) > 0.95, 'transform tilt with no rotation aims Front');
+    const one = { type: 'curve', mode: 'mir', planes: [C.genArray({ type: 'beam', beam: 20, field: 40, aim: 25 }), C.genArray({ type: 'beam', beam: 20, field: 40 }), C.genArray({ type: 'beam', beam: 20, field: 40, aim: -25 })], on: true, blend: 'add', amount: 1, turn: 0, mods: [] };
+    const base = C.layerField(one), Mi = C.layerField(Object.assign({}, one, { mods: [{ type: 'transform', on: true, p: { tilt: 0, mirror: 2 } }] }));
+    assert(Math.abs(C.fieldAt(Mi, 25, 180) - C.fieldAt(base, 25, 0)) < 1e-3 && Math.abs(C.fieldAt(Mi, 25, 0) - C.fieldAt(base, 25, 180)) < 1e-3, 'mirror Front↔Back swaps the sides');
+    const Wd = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 0, wideF: 2, wideS: 1 } }] })), b0 = C.layerField(L);
+    assert(Math.abs(C.fieldAt(Wd, 20, 0) - C.fieldAt(b0, 10, 0)) < 1e-3 && Math.abs(C.fieldAt(Wd, 10, 90) - C.fieldAt(b0, 10, 90)) < 1e-3, 'width front-back 200% doubles that spread only');
     const D = C.layerField(Object.assign({}, L, { mods: [{ type: 'doors', on: true, p: { front: 5, back: 90, left: 90, right: 90, soft: 1 } }] }));
     assert(C.fieldAt(D, 10, 0) < 0.01 && Math.abs(C.fieldAt(D, 10, 180) - C.fieldAt(T.constructor === Float32Array ? C.layerField(L) : L, 10, 180)) < 1e-4, 'barn door closes the Front side only');
     const half = 'AAAA', w = 2, h = 2;   // 2×2 slide: top row black, bottom row white (top = Front)
