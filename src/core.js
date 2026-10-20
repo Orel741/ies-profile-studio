@@ -15,7 +15,7 @@ const MODES = {
   mir:  { label: 'One-sided', map: [0, 1, 2, 1], tabs: ['Front', 'Sides', 'Back'],
           desc: 'Left matches right, front and back differ. Wall washers, sconces, lights that throw forward.' },
   asym: { label: 'Free-form', map: [0, 1, 2, 3], tabs: ['Front', 'Left', 'Back', 'Right'],
-          desc: 'Every side has its own curve. Streetlights and anything lopsided.' }
+          desc: 'Every side has its own curve. Asymmetric lights and anything lopsided.' }
 };
 
 /* ---------- generators (return Float32Array(N), relative 0..1) ---------- */

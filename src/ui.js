@@ -18,15 +18,6 @@
       { type: 'beam', beam: 80, field: 120 }, { type: 'beam', beam: 20, field: 40 }] },
     { id: 'wash', name: 'Wall washer', mode: 'mir', peak: 1500, specs: [
       { type: 'beam', beam: 36, field: 76, aim: 52 }, { type: 'beam', beam: 70, field: 110 }, { type: 'beam', beam: 22, field: 40, cutoff: 50 }] },
-    { id: 'st2', name: 'Street Type II', mode: 'asym', peak: 8000, specs: [
-      { type: 'bat', peak: 56, width: 46, center: 0.35, cutoff: 82 }, { type: 'bat', peak: 48, width: 44, center: 0.45, cutoff: 82 },
-      { type: 'beam', beam: 30, field: 50, aim: 0, cutoff: 45 }, { type: 'bat', peak: 48, width: 44, center: 0.45, cutoff: 82 }] },
-    { id: 'st3', name: 'Street Type III', mode: 'asym', peak: 8000, specs: [
-      { type: 'bat', peak: 58, width: 50, center: 0.45, cutoff: 84 }, { type: 'bat', peak: 62, width: 60, center: 0.5, cutoff: 86 },
-      { type: 'beam', beam: 40, field: 70, aim: 0, cutoff: 55 }, { type: 'bat', peak: 62, width: 60, center: 0.5, cutoff: 86 }] },
-    { id: 'st4', name: 'Street Type IV', mode: 'asym', peak: 8000, specs: [
-      { type: 'bat', peak: 62, width: 54, center: 0.4, cutoff: 86 }, { type: 'bat', peak: 60, width: 60, center: 0.45, cutoff: 86 },
-      { type: 'beam', beam: 16, field: 30, aim: 0, cutoff: 28 }, { type: 'bat', peak: 60, width: 60, center: 0.45, cutoff: 86 }] },
     { id: 'test', name: 'Orientation test', mode: 'asym', peak: 3000, specs: [
       { type: 'beam', beam: 26, field: 44, aim: 50 }, { type: 'beam', beam: 2, field: 2, aim: 180, cutoff: 10 },
       { type: 'beam', beam: 2, field: 2, aim: 180, cutoff: 10 }, { type: 'beam', beam: 2, field: 2, aim: 180, cutoff: 10 }] },
@@ -164,7 +155,7 @@
   }
   function renderPresets() {
     const host = $('presetRow'); if (!host) return; host.textContent = '';
-    PRESETS.filter(p => !/^st\d/.test(p.id)).forEach(p => {   // street lights stay under + Add layer
+    PRESETS.forEach(p => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'chip'; b.textContent = p.name; b.setAttribute('aria-pressed', String(S.preset === p.id));
       b.addEventListener('click', () => applyPreset(p));
