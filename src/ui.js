@@ -1806,9 +1806,14 @@ void main() {
     }
   }
   let dl = null;
+  // outside Claude the browser can download any file type, so the .ies is saved directly
+  function browserSave(name, data, type) {
+    const a = document.createElement('a'), url = URL.createObjectURL(new Blob([data], { type }));
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
   async function saveFile(kind) {
-    if (!dl) return;
     const t = currentIES(), base = slug();
+    if (!dl) { browserSave(base + '.ies', t, 'application/octet-stream'); say('Saved ' + base + '.ies. Drag it into the Unreal Content Browser.'); return; }
     try {
       if (kind === 'zip') await dl.save({ filename: base + '.zip', data: makeZip(base + '.ies', t) });
       else await dl.save({ filename: base + '.ies.txt', data: t });
@@ -1825,10 +1830,7 @@ void main() {
     const name = slug() + '.iesproj', text = JSON.stringify({ format: PROJ_FORMAT, version: 1, saved: new Date().toISOString(), state: stateObj() });
     try {
       if (dl) await dl.save({ filename: name, data: text });
-      else {
-        const a = document.createElement('a'), url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
-        a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
-      }
+      else browserSave(name, text, 'application/json');
       say('Saved the project as ' + name + '. Open it later with Open project to carry on editing.');
     } catch (e) {
       if (e && e.code === 'declined') say('Save cancelled.');
@@ -2034,6 +2036,7 @@ void main() {
   say('Pick a starting point, then drag the points on the curve. Everything updates live.');
   (async () => {
     try { dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
-    $('btnZip').hidden = !dl; $('btnTxt').hidden = !dl;
+    // in Claude: .zip and .txt (the app can't save .ies directly); in a plain browser: one Save .ies button
+    $('btnZip').hidden = false; $('btnTxt').hidden = !dl; if (!dl) $('btnZip').textContent = 'Save .ies';
   })();
 })();
