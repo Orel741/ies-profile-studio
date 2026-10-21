@@ -166,6 +166,7 @@ canvas { display: block; width: 100%; border-radius: 8px; }
 .keys ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 
 /* layers */
+.addrow { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .addsel { width: auto; min-height: 32px; padding: 4px 8px; font-size: 13px; font-weight: 500; background: var(--surface); }
 ul.layers { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
 .lyr { padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--plot); }
@@ -427,7 +428,8 @@ textarea#iesText {
       <article class="card" id="layersCard" aria-label="Layers">
         <div class="head ipos"><h2>Layers</h2>
           <div class="infopop" id="layInfo" hidden><p>Layers stack bottom to top and combine into the exported light. The curve editor and the preview handles shape the selected layer.</p><p id="lySrc"></p></div>
-          <select id="layerAdd" class="addsel" aria-label="Add a layer"><option value="">+ Add layer</option><option value="dup">Duplicate this layer</option><option value="file">Import .ies file as a layer</option></select>
+          <span class="addrow"><select id="layerAdd" class="addsel" aria-label="Add a layer"><option value="">+ Add layer</option><option value="curve">New curve…</option><option value="adjust">Adjustment layer</option><option value="dup">Duplicate this layer</option><option value="file">Import .ies file</option></select>
+          <select id="layerCurve" class="addsel" aria-label="Choose a curve for the new layer" hidden><option value="">Choose a curve…</option></select></span>
         </div>
         <ul class="layers" id="layerList"></ul>
         <div class="stack lprops">

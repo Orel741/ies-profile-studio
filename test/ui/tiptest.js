@@ -11,7 +11,7 @@ module.exports = async (page, name) => {
   if (name === 'desk-light') await page.screenshot({ path: 'test/shots/TIP-map.png' });
   await page.mouse.move(10, 10, { steps: 4 }); await page.waitForTimeout(100); console.log('away:', await st());
   await page.$eval('#lyBlend', e => e.scrollIntoView({ block: 'center' })); await page.waitForTimeout(200);
-  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(100);
+  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(100);
   await hover('#lyBlend', 700); console.log('blend select:', await st());
   await page.mouse.down(); await page.mouse.up(); await page.waitForTimeout(100); console.log('after click:', await st());
   await page.keyboard.press('Escape');

@@ -471,6 +471,13 @@ function compositeLayers(layers, getField) {
   const acc = makeField(); let first = true;
   for (const L of layers) {
     if (L.on === false) continue;
+    if (L.type === 'adjust') {        // no light of its own: run its modifiers over everything below, mixed in by strength
+      if (first || !(L.mods || []).some(m => m.on !== false && MOD_TYPES[m.type])) continue;
+      const M = Float32Array.from(acc), a = L.amount == null ? 1 : L.amount;
+      for (const m of L.mods) if (m.on !== false && MOD_TYPES[m.type]) applyMod(M, m);
+      for (let i = 0; i < acc.length; i++) acc[i] = Math.max(0, acc[i] + (M[i] - acc[i]) * a);
+      continue;
+    }
     const F = getField ? getField(L) : layerField(L), a = L.amount == null ? 1 : L.amount;
     const mode = first && (L.blend === 'mask' || L.blend === 'subtract') ? 'add' : L.blend || 'add';
     if (mode === 'mask') { const pk = fieldMax(F) || 1, s = clamp(a, 0, 1); for (let i = 0; i < acc.length; i++) acc[i] *= 1 - s + s * clamp(F[i] / pk, 0, 1); }
@@ -489,6 +496,7 @@ function outModeFor(layers) {
   const rank = { rot: 0, bi: 1, mir: 2, asym: 3 };
   let r = 0;
   for (const L of vis) {
+    if (L.type === 'adjust') { if ((L.mods || []).some(m => m.on !== false && FINE_MODS.has(m.type))) return 'asym'; continue; }
     if (L.type !== 'curve') return 'asym';
     if ((L.mods || []).some(m => m.on !== false && FINE_MODS.has(m.type))) return 'asym';
     const t = (((L.turn || 0) % 360) + 360) % 360;

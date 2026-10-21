@@ -148,6 +148,20 @@ for (const mode of ['rot', 'bi', 'mir', 'asym']) {
     assert(C.fieldAt(G, 20, 0) < 0.05 && C.fieldAt(G, 20, 180) > 0.5, 'gobo slide: Front dark, Back lit ' + C.fieldAt(G, 20, 0).toFixed(2) + '/' + C.fieldAt(G, 20, 180).toFixed(2));
     assert(C.fieldAt(G, 60, 180) < 1e-6, 'gobo blocks outside the slide');
   }
+  { // adjustment layers: modifiers over everything below, faded by mix; nothing below means no effect
+    const flat = [0, 1, 2, 3].map(() => C.genArray({ type: 'beam', beam: 60, field: 100 }));
+    const a = Object.assign({}, spot, { planes: flat, mods: [] }), b = Object.assign({}, spot, { planes: flat, mods: [], blend: 'add' });
+    const adj = (mods, amount) => ({ type: 'adjust', on: true, blend: 'add', amount, turn: 0, mode: 'rot', planes: flat, mods });
+    const cut = [{ type: 'cut', on: true, p: { angle: 20, soft: 1 } }];
+    const F0 = C.compositeLayers([a, b]), F1 = C.compositeLayers([a, b, adj(cut, 1)]), Fh = C.compositeLayers([a, b, adj(cut, 0.5)]);
+    assert(Math.abs(C.fieldAt(F1, 0, 0) - C.fieldAt(F0, 0, 0)) < 1e-5 && C.fieldAt(F1, 30, 0) < 1e-6 && C.fieldAt(F0, 30, 0) > 0.5, 'adjustment cut applies to both layers below');
+    assert(Math.abs(C.fieldAt(Fh, 30, 0) - 0.5 * C.fieldAt(F0, 30, 0)) < 1e-4, 'adjustment mix 50% is halfway');
+    const Fb = C.compositeLayers([adj(cut, 1), a]);
+    assert(Math.abs(C.fieldAt(Fb, 30, 0) - C.fieldAt(C.compositeLayers([a]), 30, 0)) < 1e-6, 'adjustment at the bottom does nothing');
+    const Fa = C.compositeLayers([a, adj(cut, 1), b]);
+    assert(Math.abs(C.fieldAt(Fa, 30, 0) - C.fieldAt(C.compositeLayers([b]), 30, 0)) < 1e-5, 'adjustment leaves layers above it alone');
+    assert(C.outModeFor([a, adj([{ type: 'contrast', on: true, p: {} }], 1)]) === 'rot' && C.outModeFor([a, adj([{ type: 'noise', on: true, p: {} }], 1)]) === 'asym', 'adjustment symmetry');
+  }
   assert(C.outModeFor([spot]) === 'rot' && C.outModeFor([spot, oval]) === 'bi' && C.outModeFor([Object.assign({}, spot, { mods: [{ type: 'noise', p: {} }] })]) === 'asym', 'export symmetry from layers');
   // composite export round-trips through the parser at full detail
   const noisy = Object.assign({}, spot, { mods: [{ type: 'rays', p: { count: 8, depth: 0.8 } }] });

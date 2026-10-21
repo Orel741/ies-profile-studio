@@ -3,7 +3,7 @@ module.exports = async (page, name) => {
   const fx = () => page.$$eval('#layerList li.lyr', ls => ls.map(l => l.querySelector('.lname .n').textContent + ' [' + [...l.querySelectorAll('.fx')].map(f => (f.classList.contains('off') ? '~' : '') + f.querySelector('.fxname').textContent).join(', ') + ']').join(' / '));
   const setR = async (sel, v) => { await page.$eval(sel, (el, v) => { el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true })); }, v); await page.waitForTimeout(80); };
   await page.selectOption('#modAdd', 'noise'); await page.selectOption('#modAdd', 'rays'); await page.waitForTimeout(150);
-  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(100); await page.selectOption('#modAdd', 'cut'); await page.waitForTimeout(150);
+  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(100); await page.selectOption('#modAdd', 'cut'); await page.waitForTimeout(150);
   console.log('list:', await fx());
   await page.click('#layerList li.lyr:last-child .fx:nth-child(2) input'); await page.waitForTimeout(150);
   console.log('rays off on base:', await fx(), '| selected still', await page.$eval('#lyName', e => e.value));

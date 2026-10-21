@@ -73,7 +73,7 @@
   function layerF(L) { const c = fieldCache.get(L.id); if (c && c.rev === L.rev) return c.F; const F = layerField(L); fieldCache.set(L.id, { rev: L.rev, F }); return F; }
   function comp() { if (!compCache || compCache.ver !== compVer) compCache = { ver: compVer, F: compositeLayers(S.layers, layerF) }; return compCache.F; }
   function cstats() { if (!csCache) csCache = fieldStats(comp(), S); return csCache; }
-  const fineDetail = () => S.layers.some(L => L.on !== false && (L.type !== 'curve' || (L.turn % 90) !== 0 || L.mods.some(m => m.on !== false && FINE_MODS.has(m.type))));
+  const fineDetail = () => S.layers.some(L => L.on !== false && ((L.type !== 'curve' && L.type !== 'adjust') || (L.type !== 'adjust' && (L.turn % 90) !== 0) || L.mods.some(m => m.on !== false && FINE_MODS.has(m.type))));
 
   /* ---------- formatting ---------- */
   function fmtShort(v) {
@@ -347,6 +347,7 @@
   };
   function el(tag, attrs, text) { const e = document.createElement(tag); if (attrs) Object.keys(attrs).forEach(k => { if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); }); if (text != null) e.textContent = text; return e; }
   const bottomVisible = () => S.layers.findIndex(L => L.on !== false);
+  const isAdj = L => !!L && L.type === 'adjust';
   function selectLayer(i) {
     if (i === S.cur) return;
     syncCur(); S.cur = i; bindCur(); renderLayers(); syncAll(); queue();
@@ -362,8 +363,9 @@
       pick.appendChild(el('span', { class: 'n' }, L.name));
       const tags = [i === base ? 'Base' : BLENDS[L.blend]];
       if ((L.amount == null ? 1 : L.amount) !== 1) tags.push(Math.round(L.amount * 100) + '%');
-      if (L.turn) tags.push('turned ' + Math.round(L.turn) + '°');
+      if (L.turn && L.type !== 'adjust') tags.push('turned ' + Math.round(L.turn) + '°');
       if (L.type === 'ies') tags.push('file');
+      if (L.type === 'adjust') tags[0] = i === base ? 'Adjustment · nothing below' : 'Adjustment';
       pick.appendChild(el('span', { class: 't' }, tags.join(' · ')));
       pick.addEventListener('click', () => selectLayer(i));
       const grip = gripBtn('Move ' + L.name + '. Drag, or use the up and down arrow keys', d => moveLayer(i, -d));
@@ -570,11 +572,13 @@
     const L = curLayer(); if (!L) return;
     const base = S.cur === bottomVisible();
     if (document.activeElement !== $('lyName')) $('lyName').value = L.name;
-    $('lyBlend').value = L.blend; $('lyBlend').disabled = base;
+    $('lyBlend').value = L.blend; $('lyBlend').disabled = base || isAdj(L);
+    $('lyBlend').closest('.field').hidden = isAdj(L); $('lyTurn').closest('.field').hidden = isAdj(L);
+    $('lyAmt').closest('.field').firstElementChild.textContent = isAdj(L) ? 'Mix' : 'Strength';
     $('lyBlendHint').textContent = base ? 'The bottom visible layer is the base, so its blend mode has no effect.' : BLEND_HELP[L.blend];
     $('lyAmt').value = L.amount; $('lyAmtVal').textContent = Math.round(L.amount * 100) + '%';
     $('lyTurn').value = L.turn; $('lyTurnVal').textContent = Math.round(L.turn) + '°';
-    $('lySrc').textContent = L.type === 'ies' ? 'Imported file, every direction kept. The curve editor shows it read-only.' : 'Curve layer, edited in the Light curve panel (' + MODES[L.mode].label + ').';
+    $('lySrc').textContent = isAdj(L) ? 'Adjustment layer: no light of its own. Its modifiers change everything below it; Mix fades the effect.' : L.type === 'ies' ? 'Imported file, every direction kept. The curve editor shows it read-only.' : 'Curve layer, edited in the Light curve panel (' + MODES[L.mode].label + ').';
     $('lyToCurve').hidden = L.type !== 'ies';
     $('edLayerName').textContent = S.layers.length > 1 ? L.name : '';
   }
@@ -633,10 +637,18 @@
     if (!host.dataset.sortable) { host.dataset.sortable = '1'; sortable(host, '.mod', (a, b) => moveMod(curLayer(), a, b)); }
   }
   function bindLayers() {
-    const add = $('layerAdd');
-    PRESETS.forEach(p => add.appendChild(el('option', { value: 'p:' + p.id }, 'New curve: ' + p.name)));
+    const add = $('layerAdd'), pickC = $('layerCurve');
+    PRESETS.forEach(p => pickC.appendChild(el('option', { value: 'p:' + p.id }, p.name)));
+    const hidePick = () => { pickC.hidden = true; pickC.value = ''; };
+    pickC.addEventListener('change', () => { const v = pickC.value; hidePick(); if (v) addFrom(v); });
+    pickC.addEventListener('blur', () => setTimeout(() => { if (!pickC.value && document.activeElement !== pickC) hidePick(); }, 150));
+    pickC.addEventListener('keydown', e => { if (e.key === 'Escape') { hidePick(); add.focus(); } });
     add.addEventListener('change', () => {
       const v = add.value; add.value = '';
+      if (v === 'curve') { pickC.hidden = false; pickC.focus(); try { pickC.showPicker(); } catch (e) { /* not supported: the list is focused */ } return; }
+      addFrom(v);
+    });
+    function addFrom(v) {
       if (v === 'dup') { const c = cloneLayer((syncCur(), curLayer()), true); c.name = (c.name + ' copy').slice(0, 40); addLayer(c); say('Duplicated the layer. Change its blend, strength or turn to layer the two.'); }
       else if (v === 'file') { $('fileIn').click(); }
       else if (v.startsWith('p:')) {
@@ -645,7 +657,12 @@
         const u = usedPlanes(MODES[p.mode].map); if (u.length > 1) [0, 180].forEach(g => { if (poleSpread(L.planes, u, g) > 0.002) matchPole(L.planes, u, g, 12); });
         addLayer(L); say('Added ' + p.name + ' as a new layer on top, added to the light below.');
       }
-    });
+      else if (v === 'adjust') {
+        const n = S.layers.filter(isAdj).length + 1;
+        addLayer(newLayer({ name: 'Adjustment ' + n, type: 'adjust' }));
+        say('Added an adjustment layer. Add modifiers to it to change every layer below.');
+      }
+    }
     const modAdd = $('modAdd');
     Object.keys(MOD_TYPES).forEach(k => modAdd.appendChild(el('option', { value: k }, MOD_TYPES[k].label)));
     modAdd.addEventListener('change', () => {
@@ -781,11 +798,11 @@
     const act = S.planes[S.active], col = css(PCOL[S.active]);
     trace(act); ctx.lineTo(X(Math.min(180, Math.ceil(V.hi))), T + ph); ctx.lineTo(X(Math.max(0, Math.floor(V.lo))), T + ph); ctx.closePath();
     ctx.globalAlpha = 0.13; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1;
-    trace(act); ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.stroke();
+    if (!isAdj(curLayer())) { trace(act); ctx.strokeStyle = col; ctx.lineWidth = 2.4; ctx.stroke(); }   // an adjustment has no curve of its own
     ctx.restore();
     if (!editable()) {
       ctx.font = '600 12.5px ' + css('--f-body');
-      labelBox(ctx, 'Imported file: Edit as curve in Layers to reshape it', L + pw / 2, T + ph / 2, 'center', css('--ink'), css('--surface-2'));
+      labelBox(ctx, isAdj(curLayer()) ? 'Adjustment layer: shape it with modifiers in Layers' : 'Imported file: Edit as curve in Layers to reshape it', L + pw / 2, T + ph / 2, 'center', css('--ink'), css('--surface-2'));
     }
 
     if (S.tool === 'points' && editable()) {
@@ -1898,9 +1915,9 @@ void main() {
       const okArr = (a, n) => Array.isArray(a) && a.length === n && a.every(x => typeof x === 'number' && isFinite(x));
       const readLayer = o => {
         if (!o || !MODES[o.mode] || !Array.isArray(o.planes) || o.planes.length !== 4 || !o.planes.every(a => okArr(a, N))) return null;
-        const ies = o.type === 'ies' && okArr(o.grid, NC * N);
+        const ies = o.type === 'ies' && okArr(o.grid, NC * N), adj = o.type === 'adjust';
         return newLayer({
-          name: String(o.name || 'Layer').slice(0, 40), type: ies ? 'ies' : 'curve', on: o.on !== false, blend: BLENDS[o.blend] ? o.blend : 'add',
+          name: String(o.name || 'Layer').slice(0, 40), type: ies ? 'ies' : adj ? 'adjust' : 'curve', on: o.on !== false, blend: BLENDS[o.blend] ? o.blend : 'add',
           amount: num(o.amount, 1, 0, 2), turn: num(o.turn, 0, 0, 359), mode: o.mode, planes: o.planes.map(a => Float32Array.from(a, v => clamp(v, 0, 1))),
           knots: Array.isArray(o.knots) && o.knots.length === 4 ? o.knots.map(validKnots) : [null, null, null, null], grid: ies ? Float32Array.from(o.grid, v => Math.max(0, v)) : null,
           mods: Array.isArray(o.mods) ? o.mods.map(m => m && m.type === 'tilt' ? { type: 'transform', on: m.on, p: { tilt: m.p && m.p.angle, rotate: m.p && m.p.toward } } : m).filter(m => m && MOD_TYPES[m.type]).slice(0, 12).map(m => {

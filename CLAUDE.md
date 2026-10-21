@@ -16,7 +16,8 @@ put explanations in hover tips (`.infopop` + `data-tip`), not inline paragraphs.
 - Symmetry modes (`MODES`): rot (Round), bi (Oval), mir (One-sided), asym (Free-form). Curves are `Float32Array(181)` per plane,
   with optional control points (monotone cubic spline, `fitKnots`).
 - Full-sphere field: 360 × 181 grid, index `F[c * N + g]`, bilinear `fieldAt`.
-- Layers: `curve` or `ies` (imported grid); blends add/lighten/replace/mask/subtract; amount, turn, modifiers.
+- Layers: `curve`, `ies` (imported grid) or `adjust` (no light of its own: its modifiers run over the stack below,
+  faded by `amount` shown as Mix; blend and turn are hidden); blends add/lighten/replace/mask/subtract; amount, turn, modifiers.
   `compositeLayers` makes the exported light; `outModeFor` picks the file's symmetry; `FINE_MODS` force full detail.
 - Modifiers live in `MOD_TYPES` (core.js) with UI in `MOD_FIELDS` / `MOD_HELP` / `fxText` (ui.js). Mask-type modifiers
   are cached in `MASKS` keyed by their settings. A field entry with a 7th element (options array) renders as a switch.
