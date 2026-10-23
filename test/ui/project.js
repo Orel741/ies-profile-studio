@@ -9,7 +9,7 @@ module.exports = async (page, name) => {
   await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(100);
   await page.selectOption('#modAdd', 'gobo'); await page.waitForTimeout(100);
   await page.setInputFiles('#modList .gobo input[type=file]', P.join(__dirname, 'gobo-test.png')); await page.waitForTimeout(600);
-  await page.click('#lookCard > summary'); await page.click('#lookSeg >> text="Grey surface"');
+  await page.click('#lookCard > summary'); await page.click('#lookSeg >> text="Temperature"');
   await page.$eval('#kelvin', el => { el.value = '2700'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.$eval('#fName', el => { el.value = 'My test light'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(300);

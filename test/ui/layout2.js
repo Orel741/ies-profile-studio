@@ -6,7 +6,7 @@ module.exports = async (page, name) => {
   await page.screenshot({ path: sh('top'), fullPage: false });
   await page.click('#genDet > summary'); await page.waitForTimeout(300);
   const ed = await (await page.$('[aria-label="Distribution editor"]')).boundingBox(); await page.screenshot({ path: sh('gen'), clip: { x: ed.x, y: ed.y + ed.height - 420, width: ed.width, height: 420 } });
-  await page.click('#lookCard > summary'); await page.waitForTimeout(200); await page.click('#lookSeg >> text="Grey surface"'); await page.waitForTimeout(200);
+  await page.click('#lookCard > summary'); await page.waitForTimeout(200); await page.click('#lookSeg >> text="Temperature"'); await page.waitForTimeout(200);
   console.log('look sum lit', await page.$eval('#lookSum', e => e.textContent));
   await page.click('#lookCard > summary'); await page.waitForTimeout(200);
   const wall = async () => page.$eval('#wallRVal', e => e.textContent);

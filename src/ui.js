@@ -47,7 +47,7 @@
     xr: 'auto', ys: 'lin',
     handles: true, fit: true, floorH: 3, floorRange: 6, bands: false, wallD: 0.6, wallC: 0, wallFit: true, wallRange: 3,
     layers: [], cur: 0,
-    pvLook: 'heat', kelvin: 4000, ev: 0, amb: 0.15, hmode: 'points', surf: 'floor', ceilD: 1.2
+    pvLook: 'lit', kelvin: 4000, ev: 0, amb: 0.15, hmode: 'points', surf: 'floor', ceilD: 1.2
   };
   const used = () => usedPlanes(MODES[S.mode].map);
 
@@ -232,11 +232,10 @@
     $('fLum').value = S.lumensMode; $('fV').value = String(S.vstep); $('fH').value = String(S.hstep);
     $('fH').disabled = S.mode === 'rot';
   }
-  const KPRESETS = [[1900, 'Candle'], [2700, 'Warm'], [3000, 'Halogen'], [4000, 'Neutral'], [5600, 'Daylight'], [6500, 'Cool']];
   function syncLookCtl() {
-    mkSeg($('lookSeg'), [['heat', 'Heat map'], ['lit', 'Grey surface']], k => k === S.pvLook, k => { S.pvLook = k; syncLookCtl(); queue('pv'); saveSoon(); });
+    mkSeg($('lookSeg'), [['lit', 'Temperature'], ['heat', 'Heat map']], k => k === S.pvLook, k => { S.pvLook = k; syncLookCtl(); queue('pv'); saveSoon(); });
     const lit = S.pvLook === 'lit';
-    $('lookSum').textContent = lit ? 'Grey surface · ' + Math.round(S.kelvin) + ' K' + (S.ev ? ' · ' + (S.ev > 0 ? '+' : '') + S.ev.toFixed(1) + ' EV' : '') : 'Heat map';
+    $('lookSum').textContent = lit ? 'Temperature · ' + Math.round(S.kelvin) + ' K' + (S.ev ? ' · ' + (S.ev > 0 ? '+' : '') + S.ev.toFixed(1) + ' EV' : '') : 'Heat map';
     $('litCtl').hidden = !lit; $('lookHint').textContent = lit
       ? 'Light falling on an 18% grey (middle grey) surface in the colour of the chosen temperature. Exposure 0 EV puts the brightest spot near white; room light shows the unlit grey.'
       : 'False colour from dark blue to white shows relative brightness. Hover the maps for exact lux.';
@@ -245,7 +244,6 @@
     $('kSw').style.background = 'rgb(' + g(c[0]) + ',' + g(c[1]) + ',' + g(c[2]) + ')';
     $('ev').value = S.ev; $('evVal').textContent = (S.ev > 0 ? '+' : '') + S.ev.toFixed(1) + ' EV';
     $('amb').value = S.amb; $('ambVal').textContent = Math.round(S.amb * 100) + '%';
-    mkSeg($('kPre'), KPRESETS.map(([k, n]) => [k, n + ' ' + k]), k => k === S.kelvin, k => { S.kelvin = k; syncLookCtl(); queue('pv'); saveSoon(); });
     ['bandsChk', 'bandsChkW'].forEach(id => { $(id).disabled = lit; $(id).parentElement.title = lit ? 'Isolux bands apply to the heat map' : ''; });
   }
   function syncPreviewCtl() {
@@ -2035,7 +2033,7 @@ void main() {
       if (j.cam3d) { V3.yaw = num(j.cam3d.yaw, 32, -180, 180); V3.pitch = num(j.cam3d.pitch, 24, -88, 88); V3.zoom = num(j.cam3d.zoom, 1.2, 0.35, 3); }
       S.hmode = ['points', 'edges', 'off'].includes(j.hmode) ? j.hmode : j.handles === false ? 'off' : 'points'; S.handles = S.hmode !== 'off';
       S.fit = j.fit !== false; S.floorH = num(j.floorH, 3, 0.5, 12); S.floorRange = num(j.floorRange, 6, 0.5, 40); S.bands = !!j.bands;
-      S.pvLook = j.pvLook === 'lit' ? 'lit' : 'heat'; S.kelvin = num(j.kelvin, 4000, 1000, 20000); S.ev = num(j.ev, 0, -4, 4); S.amb = num(j.amb, 0.15, 0, 1);
+      S.pvLook = j.pvLook === 'heat' ? 'heat' : 'lit'; S.kelvin = num(j.kelvin, 4000, 1000, 20000); S.ev = num(j.ev, 0, -4, 4); S.amb = num(j.amb, 0.15, 0, 1);
       S.wallD = num(j.wallD, 0.6, 0.1, 5); S.wallC = [0, 90, 180, 270].includes(j.wallC) ? j.wallC : 0;
       S.wallFit = j.wallFit !== false; S.wallRange = num(j.wallRange, 3, 0.5, 20);
       return true;
