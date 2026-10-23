@@ -121,7 +121,7 @@ for (const mode of ['rot', 'bi', 'mir', 'asym']) {
   const Fo = C.layerField(oval);
   assert(Math.abs(C.fieldAt(Fo, 30, 90) - C.intensityAt(oval.planes, C.MODES.bi.map, 30, 0)) < 1e-4, 'turn rotates the layer');
   // modifiers keep one value straight down and do something elsewhere
-  for (const type of Object.keys(C.MOD_TYPES)) {
+  for (const type of Object.keys(C.MOD_TYPES).filter(t => t !== 'mirror')) {   // mirror leaves a round light unchanged; tested below
     const L = Object.assign({}, spot, { planes: [0, 1, 2, 3].map(() => C.genArray({ type: 'beam', beam: 60, field: 100 })), mods: [{ type, on: true, p: type === 'cut' ? { angle: 40 } : type === 'blur' ? { vert: 10, around: 10 } : type === 'shapes' ? { spread: 50 } : {} }] });
     const G = C.layerField(L);
     let lo = Infinity, hi = -Infinity; for (let c = 0; c < C.NC; c++) { lo = Math.min(lo, G[c * C.N]); hi = Math.max(hi, G[c * C.N]); }
@@ -136,10 +136,16 @@ for (const mode of ['rot', 'bi', 'mir', 'asym']) {
     const T0 = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 30, rotate: 0 } }] }));
     assert(C.fieldAt(T0, 30, 0) > 0.95, 'transform tilt with no rotation aims Front');
     const one = { type: 'curve', mode: 'mir', planes: [C.genArray({ type: 'beam', beam: 20, field: 40, aim: 25 }), C.genArray({ type: 'beam', beam: 20, field: 40 }), C.genArray({ type: 'beam', beam: 20, field: 40, aim: -25 })], on: true, blend: 'add', amount: 1, turn: 0, mods: [] };
-    const base = C.layerField(one), Mi = C.layerField(Object.assign({}, one, { mods: [{ type: 'transform', on: true, p: { tilt: 0, mirror: 2 } }] }));
+    const base = C.layerField(one), Mi = C.layerField(Object.assign({}, one, { mods: [{ type: 'mirror', on: true, p: { mode: 1 } }] }));
     assert(Math.abs(C.fieldAt(Mi, 25, 180) - C.fieldAt(base, 25, 0)) < 1e-3 && Math.abs(C.fieldAt(Mi, 25, 0) - C.fieldAt(base, 25, 180)) < 1e-3, 'mirror Front↔Back swaps the sides');
-    const Wd = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 0, wideF: 2, wideS: 1 } }] })), b0 = C.layerField(L);
+    const Mc = C.layerField(Object.assign({}, one, { mods: [{ type: 'mirror', on: true, p: { mode: 4 } }] }));
+    assert(Math.abs(C.fieldAt(Mc, 25, 180) - C.fieldAt(base, 25, 0)) < 1e-3 && Math.abs(C.fieldAt(Mc, 25, 0) - C.fieldAt(base, 25, 0)) < 1e-6, 'mirror copies Front onto Back');
+    const Tn = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: -30 } }] }));
+    assert(C.fieldAt(Tn, 30, 180) > 0.95, 'negative tilt aims Back');
+    const Wd = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 0, uniform: 0, wideF: 2, wideS: 1 } }] })), b0 = C.layerField(L);
     assert(Math.abs(C.fieldAt(Wd, 20, 0) - C.fieldAt(b0, 10, 0)) < 1e-3 && Math.abs(C.fieldAt(Wd, 10, 90) - C.fieldAt(b0, 10, 90)) < 1e-3, 'width front-back 200% doubles that spread only');
+    const Wu = C.layerField(Object.assign({}, L, { mods: [{ type: 'transform', on: true, p: { tilt: 0, uniform: 1, wideF: 2, wideS: 1 } }] }));
+    assert(Math.abs(C.fieldAt(Wu, 20, 90) - C.fieldAt(b0, 10, 90)) < 1e-3, 'uniform scale widens both ways');
     const D = C.layerField(Object.assign({}, L, { mods: [{ type: 'doors', on: true, p: { front: 5, back: 90, left: 90, right: 90, soft: 1 } }] }));
     assert(C.fieldAt(D, 10, 0) < 0.01 && Math.abs(C.fieldAt(D, 10, 180) - C.fieldAt(T.constructor === Float32Array ? C.layerField(L) : L, 10, 180)) < 1e-4, 'barn door closes the Front side only');
     const half = 'AAAA', w = 2, h = 2;   // 2×2 slide: top row black, bottom row white (top = Front)
@@ -147,6 +153,11 @@ for (const mode of ['rot', 'bi', 'mir', 'asym']) {
     const G = C.layerField(Object.assign({}, L, { planes: [0, 1, 2, 3].map(() => C.genArray({ type: 'beam', beam: 80, field: 120 })), mods: [{ type: 'gobo', on: true, p: { size: 30, img } }] }));
     assert(C.fieldAt(G, 20, 0) < 0.05 && C.fieldAt(G, 20, 180) > 0.5, 'gobo slide: Front dark, Back lit ' + C.fieldAt(G, 20, 0).toFixed(2) + '/' + C.fieldAt(G, 20, 180).toFixed(2));
     assert(C.fieldAt(G, 60, 180) < 1e-6, 'gobo blocks outside the slide');
+    const wide = [0, 1, 2, 3].map(() => C.genArray({ type: 'beam', beam: 80, field: 120 })), Lw = Object.assign({}, L, { planes: wide }), Bw = C.layerField(Lw);
+    const img1 = v => '4:4:' + Buffer.from(new Array(16).fill(v)).toString('base64');
+    const Cw = C.layerField(Object.assign({}, Lw, { mods: [{ type: 'shapes', on: true, p: { shape: 3, size: 1, spread: 40, img: img1(255) } }] }));
+    const Cb = C.layerField(Object.assign({}, Lw, { mods: [{ type: 'shapes', on: true, p: { shape: 3, size: 1, spread: 40, img: img1(0) } }] }));
+    assert(Math.abs(C.fieldAt(Cw, 12, 30) - C.fieldAt(Bw, 12, 30)) < 0.02 && C.fieldAt(Cb, 12, 30) < 1e-6, 'custom shape image: white passes, black blocks');
   }
   { // adjustment layers: modifiers over everything below, faded by mix; nothing below means no effect
     const flat = [0, 1, 2, 3].map(() => C.genArray({ type: 'beam', beam: 60, field: 100 }));

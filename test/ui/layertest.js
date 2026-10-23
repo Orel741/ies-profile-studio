@@ -6,7 +6,7 @@ module.exports = async (page, name) => {
   const fileHead = async () => { await page.$eval('#fileDet', d => { d.open = true; d.dispatchEvent(new Event('toggle')); }); await page.waitForTimeout(350); return page.$eval('#iesText', t => t.value.split('\r\n').slice(8, 9).join('')); };
   log('start:', await layers(), '| beam', await txt('rdBeam'), '| header', await fileHead());
   // add an oval layer on top, turned 45 degrees
-  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(120);
+  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(120);
   log('after add:', await layers(), '| beam', await txt('rdBeam'), '| legend shown', !(await page.$eval('#edLegend', e => e.hidden)));
   await setR('#lyTurn', 45);
   log('turn 45:', await layers(), '| header', await fileHead(), '|', await txt('fileMeta'));
@@ -49,7 +49,7 @@ module.exports = async (page, name) => {
   log('after reload:', await layers(), '| beam', await txt('rdBeam'));
   // leave a nice state for screenshots
   await page.evaluate(() => localStorage.clear()); await page.reload(); await page.waitForTimeout(500);
-  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(80);
+  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(80);
   await setR('#lyAmt', 0.6); await setR('#lyTurn', 45);
   await page.selectOption('#modAdd', 'rays'); await page.waitForTimeout(80);
   await page.selectOption('#modAdd', 'noise'); await page.waitForTimeout(80);

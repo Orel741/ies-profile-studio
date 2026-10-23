@@ -260,13 +260,14 @@ const MOD_TYPES = {
   blur: { label: 'Blur', defaults: { vert: 4, around: 8 } },
   cut: { label: 'Cut above angle', defaults: { angle: 90, soft: 4 } },
   contrast: { label: 'Contrast', defaults: { gamma: 1.5 } },
-  transform: { label: 'Transform', defaults: { tilt: 20, rotate: 0, wideF: 1, wideS: 1, mirror: 0 } },
+  transform: { label: 'Transform', defaults: { tilt: 20, rotate: 0, uniform: 1, wideF: 1, wideS: 1 } },
+  mirror: { label: 'Mirror', defaults: { mode: 0 } },
   doors: { label: 'Barn doors', defaults: { front: 20, back: 20, left: 90, right: 90, soft: 3, turn: 0 } },
   gobo: { label: 'Gobo image', defaults: { size: 30, rotate: 0, level: 0, invert: 0, img: '' } },
   shapes: { label: 'Shape array', defaults: { shape: 0, layout: 0, count: 5, size: 0.6, spread: 30, soft: 0.15, rotate: 0, level: 0 } }
 };
 // modifiers that break round symmetry, so the export needs every direction at fine steps
-const FINE_MODS = new Set(['noise', 'rays', 'transform', 'doors', 'gobo', 'shapes']);
+const FINE_MODS = new Set(['noise', 'rays', 'transform', 'mirror', 'doors', 'gobo', 'shapes']);
 function blur1(arr, n, stride, count, radius, wrap) {
   if (radius < 0.5) return;
   const r = Math.ceil(radius * 2), w = [];
@@ -335,15 +336,15 @@ function b64bytes(b) {
   if (typeof atob === 'function') { const s = atob(b), o = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) o[i] = s.charCodeAt(i); return o; }
   return new Uint8Array(Buffer.from(b, 'base64'));
 }
-function goboImage(str, res) {
-  const key = str.length + ':' + str.slice(-64) + ':' + res;
+function goboImage(str, res, fallback) {
+  const key = str.length + ':' + str.slice(-64) + ':' + res + ':' + (fallback || '');
   let im = GOBO_IMG.get(key); if (im) return im;
   let w = 0, h = 0, px = null;
   const m = /^(\d+):(\d+):(.+)$/.exec(str || '');
   if (m) { w = +m[1]; h = +m[2]; px = b64bytes(m[3]); if (px.length !== w * h) px = null; }
-  if (!px) { // built-in slide: a four-pane window
+  if (!px) { // built-in: a four-pane window for gobos, a five-point star for custom shapes
     w = h = 128; px = new Uint8Array(w * h);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const fx = Math.abs(x + 0.5 - 64), fy = Math.abs(y + 0.5 - 64); px[y * w + x] = fx < 5 || fy < 5 || fx > 58 || fy > 58 ? 0 : 255; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) px[y * w + x] = fallbackPx(fallback, (x + 0.5) / 64 - 1, 1 - (y + 0.5) / 64) ? 255 : 0;
   }
   // box-filter down to res × res (the slide is square; non-square images were letterboxed when loaded)
   const out = new Float32Array(res * res);
@@ -355,8 +356,19 @@ function goboImage(str, res) {
   im = { res, d: out }; GOBO_IMG.set(key, im); if (GOBO_IMG.size > 8) GOBO_IMG.delete(GOBO_IMG.keys().next().value);
   return im;
 }
+function fallbackPx(kind, x, y) { // x right, y up, both −1..1
+  if (kind === 'star') { const a = Math.atan2(x, y), r = Math.hypot(x, y), k = Math.cos(5 * a); return r < 0.42 + 0.5 * Math.max(0, k) ** 3 + 0.08 * k; }
+  const fx = Math.abs(x) * 64, fy = Math.abs(y) * 64; return !(fx < 5 || fy < 5 || fx > 58 || fy > 58);
+}
+function sampleImg(im, u, w) { // u right, w up in −1..1; black outside
+  if (u < -1 || u > 1 || w < -1 || w > 1) return 0;
+  const res = im.res, d = im.d, fx = clamp((u + 1) / 2 * res - 0.5, 0, res - 1), fy = clamp((1 - w) / 2 * res - 0.5, 0, res - 1);
+  const x0 = Math.min(res - 2, Math.floor(fx)), y0 = Math.min(res - 2, Math.floor(fy)), tx = fx - x0, ty = fy - y0;
+  const a = d[y0 * res + x0] * (1 - tx) + d[y0 * res + x0 + 1] * tx, b = d[(y0 + 1) * res + x0] * (1 - tx) + d[(y0 + 1) * res + x0 + 1] * tx;
+  return a * (1 - ty) + b * ty;
+}
 function goboMask(M, p) {
-  const res = clamp(Math.round(p.size * 2.5), 12, 128), im = goboImage(p.img, res), inv = p.invert >= 0.5;
+  const res = clamp(Math.round(p.size * 2.5), 12, 128), im = goboImage(p.img || '', res, 'window'), inv = p.invert >= 0.5;
   eachProjected(M, p.size, p.rotate, p.level, (u, w) => {
     const fx = clamp((u + 1) / 2 * res - 0.5, 0, res - 1), fy = clamp((1 - w) / 2 * res - 0.5, 0, res - 1);   // image top = Front
     const x0 = Math.min(res - 2, Math.floor(fx)), y0 = Math.min(res - 2, Math.floor(fy)), tx = fx - x0, ty = fy - y0, d = im.d;
@@ -372,34 +384,37 @@ function shapesMask(M, p) {
   const n = clamp(Math.round(p.count), 1, 24), shape = Math.round(p.shape), ring = Math.round(p.layout) === 1;
   const sz = clamp(p.size, 0.05, 1), soft = Math.max(0.02, p.soft);
   const ins = d => 1 - smooth01(-soft, soft, d);
+  // how much light one shape lets through at local position (lx, ly), −1..1 across its cell
+  const img = shape === 3 ? goboImage(p.img || '', clamp(Math.round(160 / n), 16, 64), 'star') : null;
+  const val = (lx, ly) => img ? sampleImg(img, lx / sz, ly / sz) : ins(shapeDist(shape, lx / sz, ly / sz) * sz);
   if (!ring) {
     const cell = 2 / n;                                   // n × n grid filling the slide
     eachProjected(M, p.spread, p.rotate, p.level, (u, w) => {
       const gx = (u + 1) / cell, gy = (w + 1) / cell, lx = (gx - Math.min(n - 1, Math.floor(gx)) - 0.5) * 2, ly = (gy - Math.min(n - 1, Math.floor(gy)) - 0.5) * 2;
-      return ins(shapeDist(shape, lx / sz, ly / sz) * sz);
+      return val(lx, ly);
     });
   } else {
     const d = 1 / (n - 0.5 + 0.0001);                     // rings of shapes: one in the middle, then about 6 per ring step
     eachProjected(M, p.spread, p.rotate, p.level, (u, w) => {
       const r = Math.hypot(u, w); if (r > 1) return 0;
-      let best = Infinity;
+      let best = 0;
       for (const k of [Math.floor(r / d), Math.ceil(r / d)]) {
         if (k < 0 || k >= n) continue;
         const cnt = k === 0 ? 1 : Math.round(2 * Math.PI * k), step = 2 * Math.PI / cnt, a = Math.atan2(w, u);
         const ca = k === 0 ? 0 : Math.round(a / step) * step, cx = k * d * Math.cos(ca), cy = k * d * Math.sin(ca);
         const lx = (u - cx) / (d / 2), ly = (w - cy) / (d / 2);
         const cs = Math.cos(ca), sn = Math.sin(ca);       // shapes face outwards
-        best = Math.min(best, shapeDist(shape, (lx * cs + ly * sn) / sz, (-lx * sn + ly * cs) / sz) * sz);
+        best = Math.max(best, val(lx * cs + ly * sn, -lx * sn + ly * cs));
       }
-      return ins(best);
+      return best;
     });
   }
 }
-// Transform, in this order: mirror, widen (front-back and sideways separately), tilt toward Front, then rotate the
+// Transform, in this order: widen (front-back and sideways separately), tilt toward Front, then rotate the
 // result around the vertical axis. Each output direction is traced back through the inverse steps to the source.
 function transformField(F, p) {
   const tl = p.tilt * DEG, ct = Math.cos(tl), st = Math.sin(tl), rot = p.rotate * DEG, cr = Math.cos(rot), sr = Math.sin(rot);
-  const wf = Math.max(0.05, p.wideF), ws = Math.max(0.05, p.wideS), mir = Math.round(p.mirror), src = Float32Array.from(F);
+  const wf = Math.max(0.05, p.wideF), ws = Math.max(0.05, p.uniform >= 0.5 ? p.wideF : p.wideS), src = Float32Array.from(F);
   for (let c = 0; c < NC; c++) {
     const C = c * CSTEP * DEG, cc = Math.cos(C), sc = Math.sin(C);
     for (let g = 0; g < N; g++) {
@@ -413,10 +428,20 @@ function transformField(F, p) {
         gs = Math.hypot(ax, ay); cs = Math.atan2(ay, ax);
         if (gs > 180) { F[c * N + g] = 0; continue; }
       }
-      let Cs = cs / DEG;
-      if (mir === 1) Cs = -Cs; else if (mir === 2) Cs = 180 - Cs;          // Left↔Right, Front↔Back
-      F[c * N + g] = fieldAt(src, gs, Cs);
+      F[c * N + g] = fieldAt(src, gs, cs / DEG);
     }
+  }
+}
+// Mirror: 0 flip Left↔Right, 1 flip Front↔Back, 2 Left onto Right, 3 Right onto Left, 4 Front onto Back, 5 Back onto Front.
+// Columns are whole degrees (0 Front, 90 Left, 180 Back, 270 Right), so every mapping is an exact column copy.
+const MIRROR_MODES = ['Flip Left ↔ Right', 'Flip Front ↔ Back', 'Copy Left onto Right', 'Copy Right onto Left', 'Copy Front onto Back', 'Copy Back onto Front'];
+function mirrorField(F, mode) {
+  const src = Float32Array.from(F), lr = c => (NC - c) % NC, fb = c => (NC / 2 - c + NC) % NC;
+  for (let c = 0; c < NC; c++) {
+    const C = c * CSTEP, left = C > 0 && C < 180, right = C > 180, front = C < 90 || C > 270, back = C > 90 && C < 270;
+    const from = mode === 0 ? lr(c) : mode === 1 ? fb(c) : mode === 2 ? (right ? lr(c) : c) : mode === 3 ? (left ? lr(c) : c)
+      : mode === 4 ? (back ? fb(c) : c) : mode === 5 ? (front ? fb(c) : c) : c;
+    if (from !== c) F.set(src.subarray(from * N, from * N + N), c * N);
   }
 }
 function doorsMask(M, p) {
@@ -452,7 +477,8 @@ function applyMod(F, m) {
   } else if (m.type === 'contrast') {
     const pk = fieldMax(F) || 1;
     for (let i = 0; i < F.length; i++) F[i] = pk * Math.pow(F[i] / pk, p.gamma);
-  } else if (m.type === 'transform') { if (p.tilt || p.rotate || p.wideF !== 1 || p.wideS !== 1 || Math.round(p.mirror)) transformField(F, p); }
+  } else if (m.type === 'transform') { if (p.tilt || p.rotate || p.wideF !== 1 || (p.uniform < 0.5 && p.wideS !== 1)) transformField(F, p); }
+  else if (m.type === 'mirror') mirrorField(F, Math.round(p.mode));
 }
 
 /* ---------- layers ---------- */
@@ -689,5 +715,5 @@ function makeZip(filename, text, date) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { FINE_MODS, CSTEP, NC, makeField, fieldAt, fieldSlice, fieldMax, fbm, MOD_TYPES, applyMod, BLENDS, layerField, compositeLayers, outModeFor, fieldStats, warpPlane, warpKnots, pwl, N, DEG, MODES, splineEval, fitKnots, poleSpread, matchPole, fluxParts, usedPlanes, sampleArr, genArray, sculptDraw, sculptPush, sculptSmooth, smoothAll, mirrorUp, zeroUp, intensityAt, relMax, fluxRel, crossing, computeStats, buildIES, parseIES, makeZip, crc32, hAngles, vAngles };
+  module.exports = { MIRROR_MODES, FINE_MODS, CSTEP, NC, makeField, fieldAt, fieldSlice, fieldMax, fbm, MOD_TYPES, applyMod, BLENDS, layerField, compositeLayers, outModeFor, fieldStats, warpPlane, warpKnots, pwl, N, DEG, MODES, splineEval, fitKnots, poleSpread, matchPole, fluxParts, usedPlanes, sampleArr, genArray, sculptDraw, sculptPush, sculptSmooth, smoothAll, mirrorUp, zeroUp, intensityAt, relMax, fluxRel, crossing, computeStats, buildIES, parseIES, makeZip, crc32, hAngles, vAngles };
 }

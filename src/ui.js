@@ -45,7 +45,7 @@
     meta: { name: 'Spot 30°', manufac: '', watts: 0 }, lumensMode: 'flux', vstep: 1, hstep: 15,
     tool: 'points', brush: 6, smoothStr: 0.6, gen: Object.assign({}, GEN_DEFAULT),
     xr: 'auto', ys: 'lin',
-    handles: true, fit: true, floorH: 3, floorRange: 6, bands: false, wallD: 0.6, wallC: 0,
+    handles: true, fit: true, floorH: 3, floorRange: 6, bands: false, wallD: 0.6, wallC: 0, wallFit: true, wallRange: 3,
     layers: [], cur: 0,
     pvLook: 'heat', kelvin: 4000, ev: 0, amb: 0.15, hmode: 'points', surf: 'floor', ceilD: 1.2
   };
@@ -104,7 +104,7 @@
     if (!raf) raf = requestAnimationFrame(frame);
   }
   function dirty() { lastEdit = performance.now(); syncCur(); const L = curLayer(); if (L) L.rev = revSeq++; compVer++; stCache = null; csCache = null; queue(); scheduleText(); saveSoon(); }
-  // visibility, order, blend and strength change the mix but not any layer's own shape
+  // visibility, order, blend and exposure change the mix but not any layer's own shape
   function dirtyMix() { lastEdit = performance.now(); compVer++; csCache = null; queue(); scheduleText(); saveSoon(); }
   function frame() {
     raf = 0;
@@ -236,6 +236,7 @@
   function syncLookCtl() {
     mkSeg($('lookSeg'), [['heat', 'Heat map'], ['lit', 'Grey surface']], k => k === S.pvLook, k => { S.pvLook = k; syncLookCtl(); queue('pv'); saveSoon(); });
     const lit = S.pvLook === 'lit';
+    $('lookSum').textContent = lit ? 'Grey surface · ' + Math.round(S.kelvin) + ' K' + (S.ev ? ' · ' + (S.ev > 0 ? '+' : '') + S.ev.toFixed(1) + ' EV' : '') : 'Heat map';
     $('litCtl').hidden = !lit; $('lookHint').textContent = lit
       ? 'Light falling on an 18% grey (middle grey) surface in the colour of the chosen temperature. Exposure 0 EV puts the brightest spot near white; room light shows the unlit grey.'
       : 'False colour from dark blue to white shows relative brightness. Hover the maps for exact lux.';
@@ -256,6 +257,7 @@
     $('fitChk').checked = S.fit; $('bandsChk').checked = S.bands; $('bandsChkW').checked = S.bands;
     ['hmodeF', 'hmodeW'].forEach(id => mkSeg($(id), [['points', 'Points', '', 'Drag the curve\'s control points'], ['edges', 'Edges', '', 'Drag the beam and field edges'], ['off', 'Off']], k => k === S.hmode, k => { S.hmode = k; S.handles = k !== 'off'; pvHot = null; kHot = null; syncPreviewCtl(); queue('pv'); saveSoon(); }));
     $('wallD').value = S.wallD; $('wallDVal').textContent = S.wallD.toFixed(2) + ' m';
+    $('wallFitChk').checked = S.wallFit; $('wallR').disabled = S.wallFit; if (!S.wallFit) $('wallR').value = S.wallRange;
     mkSeg($('wallSeg'), [[0, 'In front'], [90, 'Left'], [180, 'Behind'], [270, 'Right']], k => k === S.wallC, k => { S.wallC = k; syncPreviewCtl(); queue('pv'); saveSoon(); });
   }
   function syncAll() {
@@ -317,11 +319,12 @@
     blur: [['vert', 'Up and down', 0, 20, 0.5, degF], ['around', 'Around the axis', 0, 45, 0.5, degF]],
     cut: [['angle', 'Cut above', 10, 180, 1, degF], ['soft', 'Softness', 0, 30, 0.5, degF]],
     contrast: [['gamma', 'Contrast', 0.3, 3, 0.05, v => v.toFixed(2) + '×']],
-    transform: [['tilt', 'Tilt', 0, 90, 0.5, degF], ['rotate', 'Rotation', 0, 359, 1, v => Math.round(v) + '° ' + sideName(v)],
-      ['wideF', 'Width front–back', 0.25, 3, 0.01, pctF], ['wideS', 'Width sideways', 0.25, 3, 0.01, pctF], ['mirror', 'Mirror', 0, 2, 1, null, ['Off', 'Left ↔ Right', 'Front ↔ Back']]],
+    transform: [['tilt', 'Tilt', -90, 90, 0.5, v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) + '°'], ['rotate', 'Rotation', 0, 359, 1, v => Math.round(v) + '° ' + sideName(v)],
+      ['uniform', 'Scale uniformly', 0, 1, 1, null, 'check'], ['wideF', 'Width front–back', 0.25, 3, 0.01, pctF], ['wideS', 'Width sideways', 0.25, 3, 0.01, pctF]],
+    mirror: [['mode', 'Mirror', 0, 5, 1, null, MIRROR_MODES]],
     doors: [['front', 'Front door', 5, 90, 0.5, doorF], ['back', 'Back door', 5, 90, 0.5, doorF], ['left', 'Left door', 5, 90, 0.5, doorF], ['right', 'Right door', 5, 90, 0.5, doorF], ['soft', 'Softness', 0, 20, 0.5, degF], ['turn', 'Turn doors', 0, 90, 1, degF]],
     gobo: [['size', 'Slide size', 3, 80, 0.5, degF], ['rotate', 'Rotate', 0, 359, 1, degF], ['level', 'Light through dark parts', 0, 1, 0.01, pctF], ['invert', 'Invert', 0, 1, 1, null, ['Off', 'On']]],
-    shapes: [['shape', 'Shape', 0, 2, 1, null, ['Circles', 'Squares', 'Diamonds']], ['layout', 'Layout', 0, 1, 1, null, ['Grid', 'Rings']], ['count', 'Count across', 1, 16, 1, intF], ['size', 'Shape size', 0.05, 1, 0.01, pctF],
+    shapes: [['shape', 'Shape', 0, 3, 1, null, ['Circles', 'Squares', 'Diamonds', 'Custom']], ['layout', 'Layout', 0, 1, 1, null, ['Grid', 'Rings']], ['count', 'Count across', 1, 16, 1, intF], ['size', 'Shape size', 0.05, 1, 0.01, pctF],
       ['spread', 'Spread', 3, 80, 0.5, degF], ['soft', 'Edge softness', 0, 1, 0.01, pctF], ['rotate', 'Rotate', 0, 359, 1, degF], ['level', 'Light between shapes', 0, 1, 0.01, pctF]]
   };
   function sideName(v) { const a = ((Math.round(v) % 360) + 360) % 360; return ['Front', 'Left', 'Back', 'Right'][Math.round(a / 90) % 4] + (a % 90 ? '-ish' : ''); }
@@ -333,21 +336,74 @@
     blur: 'Softens detail up and down and around the light.',
     cut: 'Removes light above an angle, like a shield or a dark-sky cutoff.',
     contrast: 'Above 1× makes the hotspot punchier, below 1× flattens it.',
-    transform: 'Tilt aims the light off its axis toward Front; Rotation then turns it around the vertical (90° aims it Left) without changing the tilt. The widths stretch or squeeze the beam in each direction, and Mirror flips it.',
+    mirror: 'Flips the light, or copies one side onto the other to make it symmetric.',
+    transform: 'Tilt aims the light off its axis toward Front (negative tilts toward Back); Rotation then turns it around the vertical (90° aims it Left) without changing the tilt. Width stretches or squeezes the beam; untick Scale uniformly to set front–back and sideways separately.',
     doors: 'Four flaps that cut the beam on each side, measured from straight down. 90° is fully open.',
     gobo: 'Projects a picture like a gobo slide: white lets light through, black blocks it. The top of the image faces Front. Without an image it uses a window pattern.',
-    shapes: 'Projects a pattern of circles, squares or diamonds, in a grid or in rings, like a dot gobo or an LED array.'
+    shapes: 'Projects a pattern of circles, squares, diamonds or your own shape from an image, in a grid or in rings, like a dot gobo or an LED array.'
   };
+  // modifier families for the + Add modifier menu
+  const MOD_GROUPS = [['Aim and shape', ['transform', 'mirror', 'doors', 'cut']], ['Patterns', ['noise', 'rays', 'rings', 'gobo', 'shapes']], ['Softness and contrast', ['blur', 'contrast']]];
+  // a small drop-down menu with optional group headings and one level of submenus; keyboard: arrows, Enter, Esc
+  function makeMenu(btn, items, onPick) {
+    let pop = null, subPop = null;
+    const close = () => { if (subPop) { subPop.remove(); subPop = null; } if (pop) { pop.remove(); pop = null; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('pointerdown', outside, true); } };
+    const outside = e => { if (!(pop && pop.contains(e.target)) && !(subPop && subPop.contains(e.target)) && e.target !== btn && !btn.contains(e.target)) close(); };
+    const focusables = m => [...m.querySelectorAll('[role="menuitem"]')];
+    const move = (m, d) => { const f = focusables(m), i = f.indexOf(document.activeElement); f[(i + d + f.length) % f.length].focus(); };
+    const build = (list, isSub, anchor) => {
+      const m = el('div', { class: 'menu' + (isSub ? ' submenu' : ''), role: 'menu' });
+      list.forEach(it => {
+        if (it.group) { m.appendChild(el('div', { class: 'mgroup', role: 'presentation' }, it.group)); return; }
+        const b = el('button', { type: 'button', class: 'mitem' + (it.sub ? ' hassub' : ''), role: 'menuitem' }, it.label);
+        if (it.title) b.title = it.title;
+        if (it.sub) {
+          b.setAttribute('aria-haspopup', 'menu');
+          const open = focusFirst => { if (subPop && subPop.dataset.of === it.label) { if (focusFirst) focusables(subPop)[0].focus({ preventScroll: true }); return; } if (subPop) subPop.remove(); subPop = build(it.sub, true, b); subPop.dataset.of = it.label; if (focusFirst) focusables(subPop)[0].focus({ preventScroll: true }); };
+          b.addEventListener('pointerenter', () => open(false));
+          b.addEventListener('click', () => open(true));
+          b.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(true); } });
+        } else {
+          b.addEventListener('pointerenter', () => { if (!isSub && subPop) { subPop.remove(); subPop = null; } });
+          b.addEventListener('click', () => { close(); btn.focus(); onPick(it.value); });
+        }
+        m.appendChild(b);
+      });
+      m.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); move(m, 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); move(m, -1); }
+        else if (e.key === 'Escape' || (isSub && e.key === 'ArrowLeft')) { e.preventDefault(); e.stopPropagation(); if (isSub) { subPop.remove(); subPop = null; anchor.focus(); } else { close(); btn.focus(); } }
+        else if (e.key === 'Tab') close();
+      });
+      document.body.appendChild(m);
+      // place it: below the button, or beside the parent item for a submenu; keep it on screen
+      const r = anchor.getBoundingClientRect(), w = m.offsetWidth, h = m.offsetHeight, vw = innerWidth, vh = innerHeight;
+      let x, y;
+      if (isSub) { x = r.right + 2; y = r.top - 6; if (x + w > vw - 8) x = r.left - w - 2; if (x < 8) { x = Math.max(8, r.left + 16); y = r.bottom; } }
+      else { x = r.right - w; y = r.bottom + 4; if (x < 8) x = 8; if (y + h > vh - 8 && r.top - h - 4 > 8) y = r.top - h - 4; }
+      m.style.left = Math.round(x + scrollX) + 'px'; m.style.top = Math.round(Math.min(y, vh - h - 8) + scrollY) + 'px';
+      return m;
+    };
+    btn.setAttribute('aria-haspopup', 'menu'); btn.setAttribute('aria-expanded', 'false');
+    btn.addEventListener('click', () => { if (pop) { close(); return; } pop = build(items, false, btn); btn.setAttribute('aria-expanded', 'true'); document.addEventListener('pointerdown', outside, true); focusables(pop)[0].focus({ preventScroll: true }); });
+    btn.addEventListener('keydown', e => { if (e.key === 'ArrowDown' && !pop) { e.preventDefault(); btn.click(); } });
+    addEventListener('resize', close);   // the menu sits on the page, so it scrolls along with its button
+  }
   const BLEND_HELP = {
     add: 'Adds this light on top, like a second bulb.',
     lighten: 'Keeps whichever is brighter in each direction.',
-    replace: 'Paints over the layers below. Strength sets how much.',
-    mask: 'Uses this layer as a stencil: light below survives where this layer is bright.',
+    replace: 'Paints over the layers below. Exposure under 0 EV lets them show through.',
+    mask: 'Uses this layer as a stencil: light below survives where this layer is bright. Exposure under 0 EV weakens the stencil.',
     subtract: 'Takes this light away from the layers below.'
   };
   function el(tag, attrs, text) { const e = document.createElement(tag); if (attrs) Object.keys(attrs).forEach(k => { if (k === 'class') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); }); if (text != null) e.textContent = text; return e; }
   const bottomVisible = () => S.layers.findIndex(L => L.on !== false);
   const isAdj = L => !!L && L.type === 'adjust';
+  // a light layer's level is an exposure offset in EV (amount = 2^EV); an adjustment layer's is a 0–100% mix
+  const EV_MIN = -8, EV_MAX = 4;
+  const amtToEv = a => (a > 0 ? clamp(Math.log2(a), EV_MIN, EV_MAX) : EV_MIN);
+  const evText = ev => (ev > 0.04 ? '+' : ev < -0.04 ? '−' : '±') + Math.abs(ev).toFixed(1) + ' EV';
+  const levelText = L => isAdj(L) ? Math.round(L.amount * 100) + '%' : evText(amtToEv(L.amount));
   function selectLayer(i) {
     if (i === S.cur) return;
     syncCur(); S.cur = i; bindCur(); renderLayers(); syncAll(); queue();
@@ -362,7 +418,7 @@
       const pick = el('button', { type: 'button', class: 'lname', 'aria-pressed': String(i === S.cur) });
       pick.appendChild(el('span', { class: 'n' }, L.name));
       const tags = [i === base ? 'Base' : BLENDS[L.blend]];
-      if ((L.amount == null ? 1 : L.amount) !== 1) tags.push(Math.round(L.amount * 100) + '%');
+      if ((L.amount == null ? 1 : L.amount) !== 1) tags.push(levelText(L));
       if (L.turn && L.type !== 'adjust') tags.push('turned ' + Math.round(L.turn) + '°');
       if (L.type === 'ies') tags.push('file');
       if (L.type === 'adjust') tags[0] = i === base ? 'Adjustment · nothing below' : 'Adjustment';
@@ -458,11 +514,11 @@
   }
   // a short summary of a modifier's settings, shown under its layer
   // ---- hover tips: rest the pointer on a feature (its title, map or control) to read about it
-  const TIP_EXTRA = { edInfo: ['#edCv'], lookInfo: ['#lookSeg'], floorInfo: ['#floorCv'], wallInfo: ['#wallCv'], polarInfo: ['#polarCv'], photoInfo: ['.readouts'], d3InfoPop: ['#d3Cv'], blendInfo: ['#lyBlend'] };
+  const TIP_EXTRA = { edInfo: ['#edCv'], lookInfo: [], floorInfo: ['#floorCv'], wallInfo: ['#wallCv'], polarInfo: ['#polarCv'], photoInfo: ['.readouts'], d3InfoPop: ['#d3Cv'], blendInfo: ['#lyBlend'] };
   function bindTips() {
     document.querySelectorAll('.infopop[id]').forEach(pop => {
       const box = pop.closest('.ipos') || pop.parentElement, id = pop.id;
-      const heads = [box.querySelector('h2') || (box.matches('p') ? box : box.querySelector('label'))];
+      const heads = [box.querySelector('h2, h3') || (box.matches('p') ? box : box.querySelector('label'))];
       (TIP_EXTRA[id] || []).forEach(q => heads.push(document.querySelector(q)));
       heads.forEach(h => { if (!h) return; h.dataset.tip = id; const d = h.getAttribute('aria-describedby'); if (!d || d.split(' ').indexOf(id) < 0) h.setAttribute('aria-describedby', ((d || '') + ' ' + id).trim()); });
     });
@@ -517,12 +573,12 @@
     img.onerror = () => { URL.revokeObjectURL(url); say('That file could not be read as an image.'); };
     img.src = url;
   }
-  function drawGoboThumb(cv, p) {
+  function drawGoboThumb(cv, p, fallback) {
     const cx = cv.getContext('2d'), R = cv.width, id = cx.createImageData(R, R), m = /^(\d+):(\d+):(.+)$/.exec(p.img || '');
     let w = 128, h = 128, px = null;
     if (m) { w = +m[1]; h = +m[2]; const s = atob(m[3]); px = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) px[i] = s.charCodeAt(i); }
     for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
-      let v; if (px) v = px[Math.floor(y * h / R) * w + Math.floor(x * w / R)]; else { const fx = Math.abs(x + 0.5 - R / 2) * 128 / R, fy = Math.abs(y + 0.5 - R / 2) * 128 / R; v = fx < 5 || fy < 5 || fx > 58 || fy > 58 ? 0 : 255; }
+      let v; if (px) v = px[Math.floor(y * h / R) * w + Math.floor(x * w / R)]; else v = fallbackPx(fallback, (x + 0.5) / (R / 2) - 1, 1 - (y + 0.5) / (R / 2)) ? 255 : 0;
       if (p.invert >= 0.5) v = 255 - v; const o = (y * R + x) * 4; id.data[o] = id.data[o + 1] = id.data[o + 2] = v; id.data[o + 3] = 255;
     }
     cx.putImageData(id, 0, 0);
@@ -535,12 +591,12 @@
       : m.type === 'blur' ? 'Blur ' + (+p.vert.toFixed(1)) + '° / ' + (+p.around.toFixed(1)) + '°'
       : m.type === 'cut' ? 'Cut above ' + Math.round(p.angle) + '°'
       : m.type === 'contrast' ? 'Contrast ' + p.gamma.toFixed(2) + '×'
-      : m.type === 'transform' ? 'Transform ' + ([p.tilt ? 'tilt ' + (+p.tilt.toFixed(1)) + '°' : '', p.rotate ? 'rotate ' + Math.round(p.rotate) + '°' : '',
-          p.wideF !== 1 || p.wideS !== 1 ? (p.wideF === p.wideS ? 'width ' + pc(p.wideF) : 'width ' + pc(p.wideF) + ' × ' + pc(p.wideS)) : '',
-          ['', 'mirror L↔R', 'mirror F↔B'][Math.round(p.mirror)]].filter(Boolean).join(' · ') || '(none)')
+      : m.type === 'transform' ? 'Transform ' + ([p.tilt ? 'tilt ' + (p.tilt < 0 ? '−' : '') + Math.abs(+p.tilt.toFixed(1)) + '°' : '', p.rotate ? 'rotate ' + Math.round(p.rotate) + '°' : '',
+          p.uniform >= 0.5 ? (p.wideF !== 1 ? 'width ' + pc(p.wideF) : '') : (p.wideF !== 1 || p.wideS !== 1 ? 'width ' + pc(p.wideF) + ' × ' + pc(p.wideS) : '')].filter(Boolean).join(' · ') || '(none)')
+      : m.type === 'mirror' ? MIRROR_MODES[Math.round(p.mode)] || 'Mirror'
       : m.type === 'doors' ? 'Barn doors ' + (['front', 'back', 'left', 'right'].filter(k => p[k] < 89.95).map(k => k[0].toUpperCase() + ' ' + Math.round(p[k]) + '°').join(' · ') || 'open')
       : m.type === 'gobo' ? 'Gobo ' + (p.img ? 'image' : 'window') + ' · ' + Math.round(p.size) + '°' + (p.invert >= 0.5 ? ' · inverted' : '')
-      : m.type === 'shapes' ? ['Circles', 'Squares', 'Diamonds'][Math.round(p.shape)] + (Math.round(p.layout) ? ' in ' + Math.round(p.count) + ' rings' : ' ' + Math.round(p.count) + ' × ' + Math.round(p.count)) + ' · ' + Math.round(p.spread) + '°'
+      : m.type === 'shapes' ? ['Circles', 'Squares', 'Diamonds', p.img ? 'Custom shapes' : 'Stars'][Math.round(p.shape)] + (Math.round(p.layout) ? ' in ' + Math.round(p.count) + ' rings' : ' ' + Math.round(p.count) + ' × ' + Math.round(p.count)) + ' · ' + Math.round(p.spread) + '°'
       : MOD_TYPES[m.type].label;
   }
   function focusMod(id) {
@@ -574,9 +630,12 @@
     if (document.activeElement !== $('lyName')) $('lyName').value = L.name;
     $('lyBlend').value = L.blend; $('lyBlend').disabled = base || isAdj(L);
     $('lyBlend').closest('.field').hidden = isAdj(L); $('lyTurn').closest('.field').hidden = isAdj(L);
-    $('lyAmt').closest('.field').firstElementChild.textContent = isAdj(L) ? 'Mix' : 'Strength';
+    $('lyAmt').closest('.field').firstElementChild.textContent = isAdj(L) ? 'Mix' : 'Exposure';
     $('lyBlendHint').textContent = base ? 'The bottom visible layer is the base, so its blend mode has no effect.' : BLEND_HELP[L.blend];
-    $('lyAmt').value = L.amount; $('lyAmtVal').textContent = Math.round(L.amount * 100) + '%';
+    const amt = $('lyAmt');
+    if (isAdj(L)) { amt.min = 0; amt.max = 1; amt.step = 0.01; amt.value = clamp(L.amount, 0, 1); }
+    else { amt.min = EV_MIN; amt.max = EV_MAX; amt.step = 0.1; amt.value = amtToEv(L.amount); }
+    $('lyAmtVal').textContent = levelText(L);
     $('lyTurn').value = L.turn; $('lyTurnVal').textContent = Math.round(L.turn) + '°';
     $('lySrc').textContent = isAdj(L) ? 'Adjustment layer: no light of its own. Its modifiers change everything below it; Mix fades the effect.' : L.type === 'ies' ? 'Imported file, every direction kept. The curve editor shows it read-only.' : 'Curve layer, edited in the Light curve panel (' + MODES[L.mode].label + ').';
     $('lyToCurve').hidden = L.type !== 'ies';
@@ -597,13 +656,29 @@
       head.appendChild(del);
       box.appendChild(head);
       const liveFx = () => { const f = document.querySelector('#layerList [data-fx="' + m.id + '"]'); if (f) f.textContent = fxText(m); };
+      const uni = m.type === 'transform' && m.p.uniform >= 0.5;
       MOD_FIELDS[m.type].forEach(([key, label, mn, mx, step, fmt, opts]) => {
+        if (uni && key === 'wideS') return;
+        if (uni && key === 'wideF') label = 'Width';
+        if (opts === 'check') {
+          const wrap = el('label', { class: 'check' }), cb = el('input', { type: 'checkbox' });
+          cb.checked = (m.p[key] == null ? MOD_TYPES[m.type].defaults[key] : m.p[key]) >= 0.5;
+          cb.addEventListener('change', () => { pushHist(); m.p[key] = cb.checked ? 1 : 0; if (key === 'uniform' && cb.checked) m.p.wideS = m.p.wideF; renderMods(); liveFx(); dirty(); });
+          wrap.appendChild(cb); wrap.appendChild(document.createTextNode(' ' + label)); box.appendChild(wrap); return;
+        }
+        if (opts && opts.length > 4) { // a dropdown for longer lists
+          const id = 'mod-' + m.id + '-' + key, wrap = el('label', { class: 'field', for: id }), sel = el('select', { id });
+          opts.forEach((o, k) => sel.appendChild(el('option', { value: String(k) }, o)));
+          sel.value = String(Math.round(m.p[key] == null ? MOD_TYPES[m.type].defaults[key] : m.p[key]));
+          sel.addEventListener('change', () => { pushHist(); m.p[key] = +sel.value; liveFx(); dirty(); });
+          wrap.appendChild(el('span', null, label)); wrap.appendChild(sel); box.appendChild(wrap); return;
+        }
         if (opts) { // a small switch instead of a slider
           const wrap = el('div', { class: 'field' }), seg = el('div', { class: 'seg', role: 'group', 'aria-label': label });
           const v0 = Math.round(m.p[key] == null ? MOD_TYPES[m.type].defaults[key] : m.p[key]);
           opts.forEach((o, k) => {
             const b = el('button', { type: 'button', 'aria-pressed': String(k === v0) }, o);
-            b.addEventListener('click', () => { pushHist(); m.p[key] = k; seg.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-pressed', String(j === k))); liveFx(); dirty(); if (m.type === 'gobo') drawGoboThumb(box.querySelector('.gthumb'), m.p); });
+            b.addEventListener('click', () => { pushHist(); m.p[key] = k; seg.querySelectorAll('button').forEach((x, j) => x.setAttribute('aria-pressed', String(j === k))); liveFx(); dirty(); if (m.type === 'gobo') drawGoboThumb(box.querySelector('.gthumb'), m.p, 'window'); if (m.type === 'shapes' && key === 'shape') renderMods(); });
             seg.appendChild(b);
           });
           wrap.appendChild(el('span', null, label)); wrap.appendChild(seg); box.appendChild(wrap); return;
@@ -612,20 +687,22 @@
         const line = el('span', { class: 'line' }), inp = el('input', { type: 'range', id, min: mn, max: mx, step }), out = el('output');
         const v0 = m.p[key] == null ? MOD_TYPES[m.type].defaults[key] : m.p[key];
         inp.value = v0; out.textContent = fmt(v0);
-        inp.addEventListener('input', () => { pushHistCo('mod' + m.id + key); m.p[key] = parseFloat(inp.value); out.textContent = fmt(m.p[key]); liveFx(); dirty(); });
+        inp.addEventListener('input', () => { pushHistCo('mod' + m.id + key); m.p[key] = parseFloat(inp.value); if (uni && key === 'wideF') m.p.wideS = m.p[key]; out.textContent = fmt(m.p[key]); liveFx(); dirty(); });
         wrap.appendChild(el('span', null, label)); line.appendChild(inp); line.appendChild(out); wrap.appendChild(line); box.appendChild(wrap);
       });
-      if (m.type === 'gobo') {
+      const imgRow = (fallback, useLabel, what) => { // thumbnail + load / clear an image stored in m.p.img
         const row = el('div', { class: 'row gobo' }), th = el('canvas', { class: 'gthumb', width: 48, height: 48, 'aria-hidden': 'true' });
         const pick = el('button', { type: 'button', class: 'btn small' }, m.p.img ? 'Change image…' : 'Load image…');
-        const clr = el('button', { type: 'button', class: 'btn small' }, 'Use window'); clr.hidden = !m.p.img;
+        const clr = el('button', { type: 'button', class: 'btn small' }, useLabel); clr.hidden = !m.p.img;
         const fin = el('input', { type: 'file', accept: 'image/*', hidden: '' });
         pick.addEventListener('click', () => fin.click());
-        fin.addEventListener('change', () => { const f = fin.files && fin.files[0]; if (f) loadGobo(f, s => { pushHist(); m.p.img = s; renderLayers(); dirty(); say('Loaded "' + f.name + '" as the gobo slide.'); }); });
+        fin.addEventListener('change', () => { const f = fin.files && fin.files[0]; if (f) loadGobo(f, s => { pushHist(); m.p.img = s; renderLayers(); dirty(); say('Loaded "' + f.name + '" as ' + what + '.'); }); });
         clr.addEventListener('click', () => { pushHist(); m.p.img = ''; renderLayers(); dirty(); });
-        drawGoboThumb(th, m.p);
+        drawGoboThumb(th, m.p, fallback);
         row.appendChild(th); row.appendChild(pick); row.appendChild(clr); row.appendChild(fin); box.appendChild(row);
-      }
+      };
+      if (m.type === 'gobo') imgRow('window', 'Use window', 'the gobo slide');
+      if (m.type === 'shapes' && Math.round(m.p.shape) === 3) imgRow('star', 'Use star', 'the custom shape (white = light)');
       if (m.type === 'noise') {
         const b = el('button', { type: 'button', class: 'btn small' }, 'New random pattern');
         b.addEventListener('click', () => { pushHist(); m.p.seed = 1 + Math.floor(Math.random() * 99); renderMods(); dirty(); });
@@ -637,19 +714,19 @@
     if (!host.dataset.sortable) { host.dataset.sortable = '1'; sortable(host, '.mod', (a, b) => moveMod(curLayer(), a, b)); }
   }
   function bindLayers() {
-    const add = $('layerAdd'), pickC = $('layerCurve');
-    PRESETS.forEach(p => pickC.appendChild(el('option', { value: 'p:' + p.id }, p.name)));
-    const hidePick = () => { pickC.hidden = true; pickC.value = ''; };
-    pickC.addEventListener('change', () => { const v = pickC.value; hidePick(); if (v) addFrom(v); });
-    pickC.addEventListener('blur', () => setTimeout(() => { if (!pickC.value && document.activeElement !== pickC) hidePick(); }, 150));
-    pickC.addEventListener('keydown', e => { if (e.key === 'Escape') { hidePick(); add.focus(); } });
-    add.addEventListener('change', () => {
-      const v = add.value; add.value = '';
-      if (v === 'curve') { pickC.hidden = false; pickC.focus(); try { pickC.showPicker(); } catch (e) { /* not supported: the list is focused */ } return; }
-      addFrom(v);
-    });
+    // the real choices live in two visually hidden selects; the visible menus below pick from them
+    const add = $('layerAdd');
+    PRESETS.forEach(p => add.appendChild(el('option', { value: 'p:' + p.id }, p.name)));
+    add.addEventListener('change', () => { const v = add.value; add.value = ''; if (v) addFrom(v); });
+    const pickVia = (sel, v) => { sel.value = v; sel.dispatchEvent(new Event('change')); };
+    makeMenu($('layerAddBtn'), [
+      { label: 'New curve', sub: PRESETS.map(p => ({ label: p.name, value: 'p:' + p.id })) },
+      { label: 'Adjustment layer', value: 'adjust' },
+      { label: 'Duplicate this layer', value: 'dup' },
+      { label: 'Import .ies file…', value: 'file' }
+    ], v => pickVia(add, v));
     function addFrom(v) {
-      if (v === 'dup') { const c = cloneLayer((syncCur(), curLayer()), true); c.name = (c.name + ' copy').slice(0, 40); addLayer(c); say('Duplicated the layer. Change its blend, strength or turn to layer the two.'); }
+      if (v === 'dup') { const c = cloneLayer((syncCur(), curLayer()), true); c.name = (c.name + ' copy').slice(0, 40); addLayer(c); say('Duplicated the layer. Change its blend, exposure or turn to layer the two.'); }
       else if (v === 'file') { $('fileIn').click(); }
       else if (v.startsWith('p:')) {
         const p = PRESETS.find(x => x.id === v.slice(2)); if (!p) return;
@@ -665,6 +742,9 @@
     }
     const modAdd = $('modAdd');
     Object.keys(MOD_TYPES).forEach(k => modAdd.appendChild(el('option', { value: k }, MOD_TYPES[k].label)));
+    const modItems = [];
+    MOD_GROUPS.forEach(([g, ks]) => { modItems.push({ group: g }); ks.forEach(k => modItems.push({ label: MOD_TYPES[k].label, value: k, title: MOD_HELP[k] })); });
+    makeMenu($('modAddBtn'), modItems, v => pickVia(modAdd, v));
     modAdd.addEventListener('change', () => {
       const k = modAdd.value; modAdd.value = ''; if (!MOD_TYPES[k]) return;
       pushHist(); curLayer().mods.push({ id: modSeq++, type: k, on: true, p: Object.assign({}, MOD_TYPES[k].defaults) });
@@ -673,7 +753,7 @@
     $('lyName').addEventListener('input', e => { curLayer().name = e.target.value.slice(0, 40) || 'Layer'; renderLayersSoon(); saveSoon(); });
     Object.keys(BLENDS).forEach(k => $('lyBlend').appendChild(el('option', { value: k }, BLENDS[k])));
     $('lyBlend').addEventListener('change', e => { pushHist(); curLayer().blend = e.target.value; renderLayers(); dirtyMix(); });
-    $('lyAmt').addEventListener('input', e => { pushHistCo('amt' + curLayer().id); curLayer().amount = parseFloat(e.target.value); $('lyAmtVal').textContent = Math.round(curLayer().amount * 100) + '%'; renderLayersSoon(); dirtyMix(); });
+    $('lyAmt').addEventListener('input', e => { const L = curLayer(), v = parseFloat(e.target.value); pushHistCo('amt' + L.id); L.amount = isAdj(L) ? v : Math.pow(2, v); $('lyAmtVal').textContent = levelText(L); renderLayersSoon(); dirtyMix(); });
     $('lyAmt').addEventListener('dblclick', () => { pushHist(); curLayer().amount = 1; syncLayerProps(); renderLayersSoon(); dirtyMix(); });
     $('lyTurn').addEventListener('input', e => { pushHistCo('turn' + curLayer().id); curLayer().turn = parseFloat(e.target.value); $('lyTurnVal').textContent = Math.round(curLayer().turn) + '°'; renderLayersSoon(); dirty(); });
     $('lyTurn').addEventListener('dblclick', () => { pushHist(); curLayer().turn = 0; syncLayerProps(); renderLayersSoon(); dirty(); });
@@ -865,7 +945,7 @@
     const u = used(), el = $('warn');
     if (u.length < 2 || !(st.rmax > 0)) { el.hidden = true; return; }
     const s0 = poleSpread(S.planes, u, 0) / st.rmax, s1 = poleSpread(S.planes, u, 180) / st.rmax;
-    if (s0 > 0.02) { warnPole = 0; $('warnText').textContent = 'The directions disagree straight down (0°) by ' + Math.round(s0 * 100) + '% of peak. A real light has one brightness there, and Unreal shows a seam in the middle of the beam.'; }
+    if (s0 > 0.02) { warnPole = 0; $('warnText').textContent = 'The directions disagree straight down (0°) by ' + Math.round(s0 * 100) + '% of peak. A real light has one brightness there, and renderers show a seam in the middle of the beam.'; }
     else if (s1 > 0.02) { warnPole = 180; $('warnText').textContent = 'The directions disagree straight up (180°) by ' + Math.round(s1 * 100) + '% of peak, which shows as a seam above the light.'; }
     else { el.hidden = true; return; }
     $('warnFix').textContent = 'Make them match at ' + warnPole + '°';
@@ -1203,7 +1283,7 @@
     else {
       const spread = ceil ? (upSpread() || 45) : (cs.gmax || 20);
       A = S.fit ? clamp(Hs * Math.tan(Math.min(spread, 82) * DEG) * 1.12, Hs * 0.35, Hs * 6) : S.floorRange;
-      $('floorRVal').textContent = (S.fit ? A.toFixed(1) : S.floorRange) + ' m';
+      $('floorRVal').textContent = (S.fit ? A.toFixed(1) : +S.floorRange.toFixed(2)) + ' m';
     }
     PF = { A, w, h, handles: [], ceil, Hs };
     cv.style.touchAction = S.handles ? 'none' : 'auto';
@@ -1229,7 +1309,8 @@
   }
   function drawWall(st, cs) {
     const cv = $('wallCv'), { ctx, w, h } = setupCanvas(cv);
-    const A = clamp(2.4 * S.wallD + 1.2, 1.5, 14), top = 0.4 * A;
+    const A = S.wallFit ? clamp(2.4 * S.wallD + 1.2, 1.5, 14) : S.wallRange, top = 0.4 * A;
+    $('wallRVal').textContent = (S.wallFit ? A.toFixed(1) : +S.wallRange.toFixed(2)) + ' m'; if (S.wallFit) $('wallR').value = A;
     PW = { A, top, w, h, handles: [] };
     cv.style.touchAction = S.handles ? 'none' : 'auto';
     const emax = paintHeat(ctx, w, h, (u, v) => wallE(u * A, top - (1 - v) * A, S.wallD, S.wallC), 'wall');
@@ -1830,7 +1911,7 @@ void main() {
   }
   async function saveFile(kind) {
     const t = currentIES(), base = slug();
-    if (!dl) { browserSave(base + '.ies', t, 'application/octet-stream'); say('Saved ' + base + '.ies. Drag it into the Unreal Content Browser.'); return; }
+    if (!dl) { browserSave(base + '.ies', t, 'application/octet-stream'); say('Saved ' + base + '.ies.'); return; }
     try {
       if (kind === 'zip') await dl.save({ filename: base + '.zip', data: makeZip(base + '.ies', t) });
       else await dl.save({ filename: base + '.ies.txt', data: t });
@@ -1839,6 +1920,16 @@ void main() {
       if (e && e.code === 'declined') say('Save cancelled.');
       else say('Saving is not available here (' + ((e && e.code) || 'error') + '). Use Copy file instead.', 'err');
     }
+  }
+  // New IES: a fresh profile (one default layer, default scale and file settings); the preview and 3D setup stay as they are
+  function newIES() {
+    pushHist(); syncCur();
+    const p = PRESETS[0];
+    S.layers = [newLayer({ name: p.name, mode: p.mode, planes: presetPlanes(p) })]; S.cur = 0; S.active = 0; S.sel = -1; bindCur(); fixPoles(); syncCur();
+    S.scaleMode = 'peak'; S.peakCd = p.peak; S.fluxLm = 1000; S.meta = { name: p.name, manufac: '', watts: 0 };
+    S.lumensMode = 'flux'; S.vstep = 1; S.hstep = 15; S.gen = Object.assign({}, GEN_DEFAULT, p.specs[0]); S.preset = p.id;
+    fieldCache.clear(); renderLayers(); syncAll(); dirty(); queue(); saveSoon();
+    say('Started a new IES. Undo brings back what you had.');
   }
   /* ---------- project files: a JSON file (.iesproj) with every layer, modifier and setting ---------- */
   const PROJ_FORMAT = 'ies-profile-studio-project';
@@ -1893,7 +1984,7 @@ void main() {
             mode: L.mode, planes: L.planes.map(a => Array.from(a, v => +v.toFixed(4))), knots: L.knots, grid: L.grid ? Array.from(L.grid, v => +v.toFixed(4)) : null }))),
           scaleMode: S.scaleMode, peakCd: S.peakCd, fluxLm: S.fluxLm, meta: S.meta, lumensMode: S.lumensMode, vstep: S.vstep, hstep: S.hstep,
           tool: S.tool, brush: S.brush, smoothStr: S.smoothStr, gen: S.gen, xr: S.xr, ys: S.ys,
-          hmode: S.hmode, surf: S.surf, ceilD: S.ceilD, cam3d: { yaw: V3.yaw, pitch: V3.pitch, zoom: V3.zoom }, fit: S.fit, floorH: S.floorH, floorRange: S.floorRange, bands: S.bands, wallD: S.wallD, wallC: S.wallC, pvLook: S.pvLook, kelvin: S.kelvin, ev: S.ev, amb: S.amb
+          hmode: S.hmode, surf: S.surf, ceilD: S.ceilD, cam3d: { yaw: V3.yaw, pitch: V3.pitch, zoom: V3.zoom }, fit: S.fit, floorH: S.floorH, floorRange: S.floorRange, bands: S.bands, wallD: S.wallD, wallC: S.wallC, wallFit: S.wallFit, wallRange: S.wallRange, pvLook: S.pvLook, kelvin: S.kelvin, ev: S.ev, amb: S.amb
     };
   }
   function validKnots(k) {
@@ -1918,11 +2009,13 @@ void main() {
         const ies = o.type === 'ies' && okArr(o.grid, NC * N), adj = o.type === 'adjust';
         return newLayer({
           name: String(o.name || 'Layer').slice(0, 40), type: ies ? 'ies' : adj ? 'adjust' : 'curve', on: o.on !== false, blend: BLENDS[o.blend] ? o.blend : 'add',
-          amount: num(o.amount, 1, 0, 2), turn: num(o.turn, 0, 0, 359), mode: o.mode, planes: o.planes.map(a => Float32Array.from(a, v => clamp(v, 0, 1))),
+          amount: num(o.amount, 1, 0, Math.pow(2, EV_MAX)), turn: num(o.turn, 0, 0, 359), mode: o.mode, planes: o.planes.map(a => Float32Array.from(a, v => clamp(v, 0, 1))),
           knots: Array.isArray(o.knots) && o.knots.length === 4 ? o.knots.map(validKnots) : [null, null, null, null], grid: ies ? Float32Array.from(o.grid, v => Math.max(0, v)) : null,
-          mods: Array.isArray(o.mods) ? o.mods.map(m => m && m.type === 'tilt' ? { type: 'transform', on: m.on, p: { tilt: m.p && m.p.angle, rotate: m.p && m.p.toward } } : m).filter(m => m && MOD_TYPES[m.type]).slice(0, 12).map(m => {
+          mods: Array.isArray(o.mods) ? o.mods.map(m => m && m.type === 'tilt' ? { type: 'transform', on: m.on, p: { tilt: m.p && m.p.angle, rotate: m.p && m.p.toward, uniform: 0, wideF: 1, wideS: 1 } } : m)
+            .flatMap(m => m && m.type === 'transform' && m.p && (m.p.mirror === 1 || m.p.mirror === 2) ? [{ type: 'mirror', on: m.on, p: { mode: m.p.mirror - 1 } }, m] : [m])
+            .map(m => m && m.type === 'transform' && m.p && m.p.uniform == null ? Object.assign({}, m, { p: Object.assign({}, m.p, { uniform: m.p.wideF === m.p.wideS ? 1 : 0 }) }) : m).filter(m => m && MOD_TYPES[m.type]).slice(0, 12).map(m => {
             const p = {}; (MOD_FIELDS[m.type] || []).forEach(([k, , mn, mx]) => { p[k] = num(m.p && m.p[k], MOD_TYPES[m.type].defaults[k], mn, mx); });
-            if (m.type === 'gobo' && m.p && typeof m.p.img === 'string' && m.p.img.length < 60000 && /^\d+:\d+:[A-Za-z0-9+/=]+$/.test(m.p.img)) p.img = m.p.img;
+            if ((m.type === 'gobo' || m.type === 'shapes') && m.p && typeof m.p.img === 'string' && m.p.img.length < 60000 && /^\d+:\d+:[A-Za-z0-9+/=]+$/.test(m.p.img)) p.img = m.p.img;
             return { id: modSeq++, type: m.type, on: m.on !== false, p };
           }) : []
         });
@@ -1944,6 +2037,7 @@ void main() {
       S.fit = j.fit !== false; S.floorH = num(j.floorH, 3, 0.5, 12); S.floorRange = num(j.floorRange, 6, 0.5, 40); S.bands = !!j.bands;
       S.pvLook = j.pvLook === 'lit' ? 'lit' : 'heat'; S.kelvin = num(j.kelvin, 4000, 1000, 20000); S.ev = num(j.ev, 0, -4, 4); S.amb = num(j.amb, 0.15, 0, 1);
       S.wallD = num(j.wallD, 0.6, 0.1, 5); S.wallC = [0, 90, 180, 270].includes(j.wallC) ? j.wallC : 0;
+      S.wallFit = j.wallFit !== false; S.wallRange = num(j.wallRange, 3, 0.5, 20);
       return true;
     } catch (e) { return false; }
   }
@@ -1990,7 +2084,41 @@ void main() {
     $('fH').addEventListener('change', e => { S.hstep = parseFloat(e.target.value); scheduleText(); saveSoon(); });
     $('floorH').addEventListener('input', e => { S.floorH = parseFloat(e.target.value); $('floorHVal').textContent = S.floorH.toFixed(1) + ' m'; lastEdit = performance.now(); queue('pv', 'read'); saveSoon(); });
     $('floorR').addEventListener('input', e => { S.floorRange = parseFloat(e.target.value); lastEdit = performance.now(); queue('pv'); saveSoon(); });
-    $('fitChk').addEventListener('change', e => { S.fit = e.target.checked; $('floorR').disabled = S.fit; queue('pv'); saveSoon(); });
+    $('fitChk').addEventListener('change', e => { S.fit = e.target.checked; if (!S.fit && PF && PF.A) { S.floorRange = clamp(Math.round(PF.A * 20) / 20, 0.5, 40); $('floorR').value = S.floorRange; } $('floorR').disabled = S.fit; queue('pv'); saveSoon(); });
+    $('wallR').addEventListener('input', e => { S.wallRange = parseFloat(e.target.value); lastEdit = performance.now(); queue('pv'); saveSoon(); });
+    $('wallFitChk').addEventListener('change', e => { S.wallFit = e.target.checked; if (!S.wallFit) S.wallRange = clamp(Math.round(((PW && PW.A) || parseFloat($('wallR').value)) * 20) / 20, 0.5, 20); $('wallR').value = S.wallRange; $('wallR').disabled = S.wallFit; queue('pv'); saveSoon(); });
+    // zoom the floor or wall map with the wheel, a trackpad pinch or a two-finger pinch, when its view isn't on Auto
+    const zoomable = (cvId, auto, key, sliderId, lo, hi) => {
+      const cv = $(cvId), setRange = v => { S[key] = clamp(Math.round(v * 20) / 20, lo, hi); $(sliderId).value = S[key]; lastEdit = performance.now(); queue('pv'); saveSoon(); };
+      cv.addEventListener('wheel', e => {
+        if (auto()) return;                                   // on Auto the page scrolls as usual
+        e.preventDefault();
+        const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        setRange(S[key] * Math.exp(d * (e.ctrlKey ? 0.01 : 0.0015)));
+      }, { passive: false });
+      let pinch = null;
+      cv.addEventListener('touchstart', e => { if (!auto() && e.touches.length === 2) { const [a, b] = e.touches; pinch = { d: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), r: S[key] }; } }, { passive: true });
+      cv.addEventListener('touchmove', e => { if (!pinch || e.touches.length !== 2) return; e.preventDefault(); const [a, b] = e.touches; setRange(pinch.r * pinch.d / Math.max(10, Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY))); }, { passive: false });
+      cv.addEventListener('touchend', e => { if (e.touches.length < 2) pinch = null; });
+    };
+    zoomable('floorCv', () => S.fit, 'floorRange', 'floorR', 0.5, 40);
+    zoomable('wallCv', () => S.wallFit, 'wallRange', 'wallR', 0.5, 20);
+    // 3D full screen: the browser's full screen where allowed, otherwise the card fills the window
+    const d3c = $('d3Card'), d3b = $('d3Full');
+    const d3Is = () => document.fullscreenElement === d3c || d3c.classList.contains('full');
+    const d3Sync = () => { const on = d3Is(); d3b.setAttribute('aria-pressed', String(on)); d3b.textContent = on ? 'Exit full screen' : 'Full screen'; document.body.style.overflow = d3c.classList.contains('full') ? 'hidden' : ''; queue('d3'); };
+    const d3Toggle = async () => {
+      if (d3Is()) { if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) { /* already out */ } } d3c.classList.remove('full'); d3Sync(); return; }
+      try { if (!d3c.requestFullscreen || !document.fullscreenEnabled) throw new Error('no'); await d3c.requestFullscreen(); }
+      catch (e) { d3c.classList.add('full'); }
+      d3Sync(); $('d3Cv').focus();
+    };
+    d3b.addEventListener('click', d3Toggle);
+    document.addEventListener('fullscreenchange', d3Sync);
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && d3c.classList.contains('full')) { d3c.classList.remove('full'); d3Sync(); }
+      else if ((e.key === 'f' || e.key === 'F') && document.activeElement === $('d3Cv') && !e.ctrlKey && !e.metaKey) { e.preventDefault(); d3Toggle(); }
+    });
     ['bandsChk', 'bandsChkW'].forEach(id => $(id).addEventListener('change', e => { S.bands = e.target.checked; $('bandsChk').checked = $('bandsChkW').checked = S.bands; queue('pv'); saveSoon(); }));
     $('ceilD').addEventListener('input', e => { S.ceilD = parseFloat(e.target.value); $('ceilDVal').textContent = S.ceilD.toFixed(1) + ' m'; lastEdit = performance.now(); queue('pv'); saveSoon(); });
     $('kelvin').addEventListener('input', e => { S.kelvin = parseFloat(e.target.value); syncLookCtl(); lastEdit = performance.now(); queue('pv'); saveSoon(); });
@@ -2006,6 +2134,7 @@ void main() {
     $('btnZip').addEventListener('click', () => saveFile('zip')); $('btnTxt').addEventListener('click', () => saveFile('txt'));
     $('btnImport').addEventListener('click', () => $('fileIn').click());
     $('btnSaveProj').addEventListener('click', saveProject);
+    $('btnNew').addEventListener('click', newIES);
     $('btnOpenProj').addEventListener('click', () => $('projIn').click());
     $('projIn').addEventListener('change', () => {
       const f = $('projIn').files && $('projIn').files[0]; $('projIn').value = ''; if (!f) return;

@@ -4,8 +4,8 @@ module.exports = async (page, name) => {
   const mods = () => page.$$eval('#modList .mhead strong', e => e.map(x => x.textContent).join(','));
   const drag = async (sel, dy) => { const b = await (await page.$(sel)).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2 + dy, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(200); };
   await page.selectOption('#modAdd', 'noise'); await page.selectOption('#modAdd', 'rays'); await page.selectOption('#modAdd', 'cut');
-  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(100);
-  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(150);
+  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(100);
+  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(150);
   console.log('start:', await fx());
   await drag('#layerList > li:nth-child(1) .lname', 140);
   console.log('top layer dragged down 2:', await fx());

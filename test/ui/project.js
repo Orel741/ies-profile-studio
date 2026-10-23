@@ -6,10 +6,10 @@ module.exports = async (page, name) => {
   const ies = async () => { await page.$eval('#fileDet', d => { d.open = true; d.dispatchEvent(new Event('toggle')); }); await page.waitForTimeout(400); return page.$eval('#iesText', t => t.value.split('\r\n').slice(1).join('\n')); };
   await page.selectOption('#modAdd', 'transform'); await page.waitForTimeout(100);
   await page.$eval('#modList input[id$="-tilt"]', el => { el.value = '30'; el.dispatchEvent(new Event('input', { bubbles: true })); });
-  await page.selectOption('#layerAdd', 'curve'); await page.selectOption('#layerCurve', 'p:ell'); await page.waitForTimeout(100);
+  await page.selectOption('#layerAdd', 'p:ell'); await page.waitForTimeout(100);
   await page.selectOption('#modAdd', 'gobo'); await page.waitForTimeout(100);
   await page.setInputFiles('#modList .gobo input[type=file]', P.join(__dirname, 'gobo-test.png')); await page.waitForTimeout(600);
-  await page.click('#lookSeg >> text="Grey surface"');
+  await page.click('#lookCard > summary'); await page.click('#lookSeg >> text="Grey surface"');
   await page.$eval('#kelvin', el => { el.value = '2700'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.$eval('#fName', el => { el.value = 'My test light'; el.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.waitForTimeout(300);

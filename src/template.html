@@ -106,6 +106,17 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
 #d3Cv { aspect-ratio: 1 / 1.05; height: auto; max-width: 100%; border-radius: 8px; border: 1px solid var(--line); background: #0b0f16; touch-action: none; cursor: grab; }
 @media (min-width: 1040px) and (max-width: 1499px) { #d3Cv { aspect-ratio: 16 / 9; } }
 .card { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.subsec { width: 100%; box-sizing: border-box; border-top: 1px solid var(--line); margin-top: 14px; padding-top: 10px; }
+.subsec > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.subsec > summary::-webkit-details-marker { display: none; }
+.subsec > summary::after { content: "+"; font-family: var(--f-mono); color: var(--ink-2); }
+.subsec[open] > summary::after { content: "–"; }
+.subsec[open] > summary { margin-bottom: 10px; }
+.subsec h3 { margin: 0; font: 600 13px var(--f-body); }
+.sumnote { font: 400 12px var(--f-body); color: var(--ink-2); margin-left: 8px; }
+#d3Card.full { position: fixed; inset: 0; z-index: 90; border-radius: 0; display: flex; flex-direction: column; gap: 8px; }
+#d3Card:fullscreen { display: flex; flex-direction: column; gap: 8px; border-radius: 0; }
+#d3Card.full #d3Cv, #d3Card:fullscreen #d3Cv { flex: 1 1 auto; min-height: 0; aspect-ratio: auto; width: 100%; height: 100%; }
 .card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .card > summary::-webkit-details-marker { display: none; }
 .card > summary::after { content: "+"; font-family: var(--f-mono); color: var(--ink-2); }
@@ -135,6 +146,7 @@ kbd { font-family: var(--f-mono); font-size: 11px; border: 1px solid var(--line)
 .field .line { display: flex; align-items: center; gap: 10px; }
 .field output { font-family: var(--f-mono); font-size: 12px; min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .field output.wide { min-width: 96px; }
+.field output.ev { min-width: 64px; white-space: nowrap; }
 input[type="range"] { width: 100%; accent-color: var(--ink); min-width: 0; }
 input[type="text"], input[type="number"], select {
   width: 100%; min-height: 36px; padding: 6px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--plot);
@@ -166,12 +178,20 @@ canvas { display: block; width: 100%; border-radius: 8px; }
 .keys ul { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 
 /* layers */
-.addrow { display: inline-flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.addbtn::after { content: " ▾"; font-size: 10px; opacity: 0.6; }
+.menu { position: absolute; z-index: 120; min-width: 190px; max-width: min(300px, calc(100vw - 16px)); max-height: min(70vh, 520px); overflow: auto; padding: 4px;
+  background: var(--surface); border: 1px solid var(--grid-strong); border-radius: 10px; box-shadow: 0 10px 28px color-mix(in srgb, var(--ink) 22%, transparent); display: grid; }
+.mitem { text-align: left; border: 0; background: none; color: var(--ink); font: 500 13px var(--f-body); padding: 7px 10px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+.mitem:hover, .mitem:focus-visible, .mitem[aria-expanded="true"] { background: var(--surface-2); outline: none; }
+.mitem.hassub::after { content: "▸"; opacity: 0.55; }
+.mgroup { font: 600 10.5px var(--f-body); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); padding: 8px 10px 3px; }
+.mgroup:first-child { padding-top: 4px; }
 .addsel { width: auto; min-height: 32px; padding: 4px 8px; font-size: 13px; font-weight: 500; background: var(--surface); }
-ul.layers { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+ul.layers { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; grid-template-columns: minmax(0, 1fr); }
 .lyr { padding: 4px 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--plot); }
 .lrow { display: flex; align-items: center; gap: 6px; }
-.fxlist { list-style: none; margin: 0 0 2px; padding: 0 0 0 22px; display: grid; gap: 0; }
+.fxlist { list-style: none; margin: 0 0 2px; padding: 0 0 0 22px; display: grid; gap: 0; grid-template-columns: minmax(0, 1fr); }
+.fx { min-width: 0; }
 .fx { display: flex; align-items: center; gap: 6px; min-height: 22px; }
 .fx input[type="checkbox"] { width: 13px !important; height: 13px !important; }
 .fxname { border: 0; background: none; padding: 1px 4px; border-radius: 4px; font: 400 11.5px var(--f-body); color: var(--ink-2); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
@@ -190,6 +210,8 @@ ul.layers { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 
 .lprops { border-top: 1px solid var(--line); padding-top: 12px; }
 .mod { border: 1px solid var(--line); border-radius: 8px; padding: 10px; display: grid; gap: 8px; background: var(--plot); }
 .mod.off > :not(.mhead) { opacity: 0.5; }
+.mod .check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink); }
+.mod .check input { width: 16px; height: 16px; accent-color: var(--ink); }
 .gobo { gap: 8px; align-items: center; } .gthumb { width: 48px; height: 48px; border-radius: 6px; border: 1px solid var(--line); image-rendering: auto; }
 .mod .seg button { padding: 4px 9px; font-size: 12px; }
 .mhead { display: flex; align-items: center; gap: 6px; cursor: grab; }
@@ -216,7 +238,7 @@ ul.layers { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 
   box-shadow: 0 8px 24px color-mix(in srgb, var(--ink) 18%, transparent); opacity: 0; transform: translateY(3px); transition: opacity 0.12s, transform 0.12s; }
 .tip.show { opacity: 1; transform: none; }
 .tip p { margin: 0; } .tip ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; } .tip [hidden] { display: none; }
-h2[data-tip], .mhead strong[data-tip], label[data-tip], p.note[data-tip] { text-decoration: underline dotted color-mix(in srgb, var(--ink-2) 45%, transparent); text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: help; }
+h2[data-tip], h3[data-tip], .mhead strong[data-tip], label[data-tip], p.note[data-tip] { text-decoration: underline dotted color-mix(in srgb, var(--ink-2) 45%, transparent); text-decoration-thickness: 1px; text-underline-offset: 4px; cursor: help; }
 .info { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 600 11px/1 var(--f-body); font-style: italic; display: inline-flex; align-items: center; justify-content: center; padding: 0; margin-left: 6px; vertical-align: 2px; cursor: pointer; flex: none; }
 .info:hover { border-color: var(--grid-strong); color: var(--ink); }
 .info[aria-expanded="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
@@ -259,9 +281,10 @@ textarea#iesText {
   <header class="bar">
     <div>
       <h1>IES Profile Studio</h1>
-      <p class="sub">Shape a light, preview it, export an IES file for Unreal.</p>
+      <p class="sub">Shape a light, preview it, export an IES file.</p>
     </div>
     <div class="actions">
+      <button class="btn" id="btnNew" type="button" title="Start a fresh profile (Undo brings the old one back)">New IES</button>
       <button class="btn" id="btnOpenProj" type="button">Open project</button>
       <input id="projIn" class="vh" type="file" accept=".iesproj,.json,application/json" tabindex="-1" aria-label="Choose a project file to open">
       <button class="btn" id="btnSaveProj" type="button">Save project</button>
@@ -340,15 +363,24 @@ textarea#iesText {
           <button class="btn small" id="btnAll" type="button" title="Use this curve for every direction">Copy to all directions</button>
           <button class="btn small" id="btnSimplify" type="button" title="Refit this curve with fewer points">Fewer points</button>
         </div>
+        <details class="subsec" id="genDet">
+          <summary class="ipos"><h3>Curve generator</h3><span class="infopop" id="genInfo" hidden><span>Builds a curve from a few settings. The dashed violet line in the editor previews it before you apply.</span></span></summary>
+          <div class="stack">
+            <div class="seg" id="genType"></div>
+            <div class="stack" id="genFields"></div>
+            <div class="row">
+              <button class="btn small" id="genApply" type="button">Apply</button>
+              <button class="btn small" id="genAll" type="button">Apply to all directions</button>
+            </div>
+          </div>
+        </details>
 
       </article>
 
-      <article class="card" id="lookCard" aria-label="Preview look">
-        <div class="row ipos" style="gap:10px 16px">
-          <h2>Preview look</h2>
-          <div class="seg" id="lookSeg"></div>
-          <div class="infopop" id="lookInfo" hidden><p id="lookHint"></p></div>
-        </div>
+      <details class="card" id="lookCard" aria-label="Preview look">
+        <summary class="ipos"><h2>Preview look <span class="sumnote" id="lookSum"></span></h2>
+          <span class="infopop" id="lookInfo" hidden><span id="lookHint"></span></span></summary>
+        <div class="seg" id="lookSeg"></div>
         <div class="stack" id="litCtl" style="margin-top:12px" hidden>
           <div class="row" style="gap:8px 14px; align-items:center">
             <span class="kswatch" id="kSw" aria-hidden="true"></span>
@@ -360,12 +392,12 @@ textarea#iesText {
             <label class="field"><span>Room light</span><span class="line"><input id="amb" type="range" min="0" max="1" step="0.01"><output id="ambVal">15%</output></span></label>
           </div>
         </div>
-      </article>
+      </details>
 
       <div class="views">
         <article class="card" aria-label="Floor preview">
           <div class="head ipos"><h2><span id="floorTitle">Floor</span></h2><span class="hint" id="floorSub">From above</span>
-            <div class="infopop" id="floorInfo" hidden><p id="floorHint"></p><p>Front is at the top. Hover the map for lux.</p></div>
+            <div class="infopop" id="floorInfo" hidden><p id="floorHint"></p><p>Front is at the top. Hover the map for lux. Untick Auto, then scroll or pinch on the map to zoom.</p></div>
           </div>
           <canvas id="floorCv" class="heat" role="img" aria-label="Map of illuminance on the floor below the fixture or the ceiling above it, with draggable curve points"></canvas>
           <p class="hover" id="floorHover"> </p>
@@ -374,12 +406,12 @@ textarea#iesText {
             <div class="row hrow"><span class="hint">Handles</span><div class="seg" id="hmodeF"></div><label class="check" title="Split brightness into 10% bands"><input id="bandsChk" type="checkbox"> Isolux</label></div>
             <label class="field"><span>Mounting height</span><span class="line"><input id="floorH" type="range" min="0.5" max="12" step="0.1" value="3"><output id="floorHVal">3.0 m</output></span></label>
             <label class="field" id="ceilWrap" hidden><span>Ceiling above the fixture</span><span class="line"><input id="ceilD" type="range" min="0.1" max="8" step="0.1" value="1.2"><output id="ceilDVal">1.2 m</output></span></label>
-            <div class="field"><span class="line" style="justify-content:space-between"><span>View half-width</span><label class="check" style="font-size:12px"><input id="fitChk" type="checkbox" checked> Auto</label></span><span class="line"><input id="floorR" type="range" min="0.5" max="40" step="0.5" value="6" aria-label="View half-width"><output id="floorRVal" class="wide">6 m</output></span></div>
+            <div class="field"><span class="line" style="justify-content:space-between"><span>View half-width</span><label class="check" style="font-size:12px"><input id="fitChk" type="checkbox" checked> Auto</label></span><span class="line"><input id="floorR" type="range" min="0.5" max="40" step="0.05" value="6" aria-label="View half-width" title="With Auto off, scroll or pinch on the map to zoom"><output id="floorRVal" class="wide">6 m</output></span></div>
           </div>
         </article>
         <article class="card" aria-label="Wall preview">
           <div class="head ipos"><h2>Wall</h2><span class="hint">Facing the wall</span>
-            <div class="infopop" id="wallInfo" hidden><p id="wallHint"></p><p>Hover the map for lux.</p></div>
+            <div class="infopop" id="wallInfo" hidden><p id="wallHint"></p><p>Hover the map for lux. Untick Auto, then scroll or pinch on the map to zoom.</p></div>
           </div>
           <canvas id="wallCv" class="heat" role="img" aria-label="Map of illuminance on a wall beside the fixture, with draggable curve points for the side of the light facing it"></canvas>
           <p class="hover" id="wallHover"> </p>
@@ -387,6 +419,7 @@ textarea#iesText {
             <div class="field"><span>Wall side</span><div class="seg" id="wallSeg"></div></div>
             <div class="row hrow"><span class="hint">Handles</span><div class="seg" id="hmodeW"></div><label class="check" title="Split brightness into 10% bands"><input id="bandsChkW" type="checkbox"> Isolux</label></div>
             <label class="field"><span>Distance from wall</span><span class="line"><input id="wallD" type="range" min="0.1" max="5" step="0.05" value="0.6"><output id="wallDVal">0.60 m</output></span></label>
+            <div class="field"><span class="line" style="justify-content:space-between"><span>View half-width</span><label class="check" style="font-size:12px"><input id="wallFitChk" type="checkbox" checked> Auto</label></span><span class="line"><input id="wallR" type="range" min="0.5" max="20" step="0.05" value="3" aria-label="Wall view half-width" title="With Auto off, scroll or pinch on the map to zoom"><output id="wallRVal" class="wide">3 m</output></span></div>
           </div>
         </article>
       </div>
@@ -419,8 +452,8 @@ textarea#iesText {
       <details class="card" id="fileDet">
         <summary><h2>IES file text <span class="mono" id="fileMeta" style="font-weight:400;color:var(--ink-2);font-size:12px"></span></h2></summary>
         <textarea id="iesText" readonly spellcheck="false" aria-label="Generated IES file"></textarea>
-        <p class="note ipos">In Unreal, drag the .ies into the Content Browser and assign it to a light's IES Texture.
-          <span class="infopop" id="ueInfo" hidden><span>Unpack the .zip first, or rename the .txt to end in .ies. Straight down here is the light's forward direction in Unreal. Recent UE5 versions use Front, Left, Back and Right separately (C0, C90, C180, C270 in the file); older ones use one curve. Use the Orientation test preset to see which way Front faces.</span></span></p>
+        <p class="note ipos">Load the .ies into your renderer or 3D app as the light's IES profile.
+          <span class="infopop" id="ueInfo" hidden><span>Unpack the .zip first, or rename the .txt to end in .ies. Straight down (0°) is the light's forward axis. Front, Left, Back and Right are written as C0, C90, C180 and C270; some apps read only one of them. Use the Orientation test preset to check which way Front faces in yours.</span></span></p>
       </details>
     </section>
 
@@ -428,37 +461,25 @@ textarea#iesText {
       <article class="card" id="layersCard" aria-label="Layers">
         <div class="head ipos"><h2>Layers</h2>
           <div class="infopop" id="layInfo" hidden><p>Layers stack bottom to top and combine into the exported light. The curve editor and the preview handles shape the selected layer.</p><p id="lySrc"></p></div>
-          <span class="addrow"><select id="layerAdd" class="addsel" aria-label="Add a layer"><option value="">+ Add layer</option><option value="curve">New curve…</option><option value="adjust">Adjustment layer</option><option value="dup">Duplicate this layer</option><option value="file">Import .ies file</option></select>
-          <select id="layerCurve" class="addsel" aria-label="Choose a curve for the new layer" hidden><option value="">Choose a curve…</option></select></span>
+          <button class="btn small addbtn" id="layerAddBtn" type="button">+ Add layer</button>
+          <select id="layerAdd" class="vh" tabindex="-1" aria-hidden="true"><option value=""></option><option value="adjust">Adjustment layer</option><option value="dup">Duplicate this layer</option><option value="file">Import .ies file</option></select>
         </div>
         <ul class="layers" id="layerList"></ul>
         <div class="stack lprops">
           <label class="field"><span>Name</span><input id="lyName" type="text" maxlength="40" autocomplete="off"></label>
           <div class="field ipos"><label for="lyBlend">Blend</label><select id="lyBlend"></select>
             <div class="infopop" id="blendInfo" hidden><p id="lyBlendHint"></p><p>Add: like a second bulb. Lighten: the brighter wins. Replace: paints over. Mask: a stencil for the layers below. Subtract: removes light.</p></div></div>
-          <label class="field"><span>Strength</span><span class="line"><input id="lyAmt" type="range" min="0" max="2" step="0.01"><output id="lyAmtVal">100%</output></span></label>
+          <label class="field" title="Double-click the slider to reset"><span>Exposure</span><span class="line"><input id="lyAmt" type="range" min="-8" max="4" step="0.1"><output id="lyAmtVal" class="ev">±0.0 EV</output></span></label>
           <label class="field"><span>Turn</span><span class="line"><input id="lyTurn" type="range" min="0" max="359" step="1"><output id="lyTurnVal">0°</output></span></label>
           <button class="btn small" id="lyToCurve" type="button" hidden>Edit as curve</button>
         </div>
         <div class="mods">
           <div class="head" style="margin:14px 0 8px"><h2 style="font-size:14px">Modifiers</h2>
-            <select id="modAdd" class="addsel" aria-label="Add a modifier"><option value="">+ Add modifier</option></select>
+            <button class="btn small addbtn" id="modAddBtn" type="button">+ Add modifier</button><select id="modAdd" class="vh" tabindex="-1" aria-hidden="true"><option value=""></option></select>
           </div>
           <div class="stack" id="modList"></div>
         </div>
       </article>
-
-      <details class="card" id="genDet" open>
-        <summary class="ipos"><h2>Curve generator</h2><span class="infopop" id="genInfo" hidden><span>Builds a curve from a few settings. The dashed violet line in the editor previews it before you apply.</span></span></summary>
-        <div class="stack">
-          <div class="seg" id="genType"></div>
-          <div class="stack" id="genFields"></div>
-          <div class="row">
-            <button class="btn small" id="genApply" type="button">Apply</button>
-            <button class="btn small" id="genAll" type="button">Apply to all directions</button>
-          </div>
-        </div>
-      </details>
 
       <details class="card" open>
         <summary><h2>Intensity scale</h2></summary>
@@ -495,8 +516,8 @@ textarea#iesText {
     </aside>
 
     <aside class="view3d" aria-label="3D view">
-      <article class="card">
-        <div class="head ipos"><h2>3D view</h2><button class="btn small" id="d3Reset" type="button">Reset view</button>
+      <article class="card" id="d3Card">
+        <div class="head ipos"><h2>3D view</h2><span class="row" style="gap:6px"><button class="btn small" id="d3Reset" type="button">Reset view</button><button class="btn small" id="d3Full" type="button" aria-pressed="false" title="Full screen (F). Esc to leave">Full screen</button></span>
           <div class="infopop" id="d3InfoPop" hidden><p>Drag to orbit (also below the floor or above the ceiling, where they drop out), scroll or pinch to zoom, double-click to reset. Uses the floor height, wall distance and side, and the preview look. A ceiling appears for upward light.</p></div></div>
         <canvas id="d3Cv" tabindex="0" role="img" aria-label="3D view of a floor and a back wall lit by the light. Drag to orbit, scroll to zoom, arrow keys also orbit."></canvas>
         <p class="hint" id="d3Msg" hidden></p>
