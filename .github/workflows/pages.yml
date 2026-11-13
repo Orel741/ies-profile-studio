@@ -30,7 +30,8 @@ jobs:
       - name: Prepare site
         run: |
           mkdir -p _site
-          cp dist/ies-profile-studio.html _site/index.html
+          # The page has no document head of its own (artifact hosting adds one), so add doctype, charset and viewport
+          { printf '<!doctype html>\n<html lang="en">\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'; cat dist/ies-profile-studio.html; } > _site/index.html
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
