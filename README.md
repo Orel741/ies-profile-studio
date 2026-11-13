@@ -29,3 +29,12 @@ npm run test:ui -- test/ui/dragtest.js   # build + headless browser run, screens
 | `build.js` | Produces `dist/ies-profile-studio.html` |
 | `test/unit.js` | Node unit tests for `core.js` |
 | `test/ui/` | Playwright runner (`run.js`) and interaction scripts |
+
+## License
+
+Copyright © 2026 Jan (Orel741)
+
+This program is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License](LICENSE) as published by the Free Software Foundation, either version 3
+of the License, or (at your option) any later version. It is distributed WITHOUT ANY WARRANTY.
+Modified versions you distribute must stay open source under the same license.

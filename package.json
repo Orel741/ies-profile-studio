@@ -2,6 +2,7 @@
   "name": "ies-profile-studio",
   "version": "1.0.0",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "description": "Browser app for drawing IES (LM-63) light profiles for Unreal Engine 5",
   "scripts": {
     "build": "node build.js",
