@@ -3,7 +3,18 @@
 A single-page browser app for drawing IES (LM-63-2002, Type C) light profiles.
 Shape the light with curves and control points, stack layers with blend modes and modifiers
 (transform, mirror, barn doors, cut, noise, rays, rings, gobo image, shape array, blur, contrast) and adjustment layers, check it on
-floor, wall and 3D previews, and export a `.ies` file.
+floor, wall and 3D previews, and export a `.ies` file. Existing `.ies` files can be imported as layers,
+and the whole session can be saved and reopened as an `.iesproj` project file.
+
+## Photometric type
+
+The app works only with **Type C** photometry (the standard for downlights, spots and most luminaires;
+also what renderers expect).
+
+- **Export** always writes LM-63-2002, Type C, with `TILT=NONE`. The horizontal range follows the profile's
+  symmetry: Round (0° only), Oval (0–90°), One-sided (0–180°) or Free-form (0–360°).
+- **Import** reads LM-63 files of photometric type C only. Type A and Type B files (floodlights, automotive)
+  are rejected with a message; convert them to Type C first.
 
 ## Use it
 
