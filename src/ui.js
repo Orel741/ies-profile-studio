@@ -1040,7 +1040,7 @@
         moveKnot(drag.idx, deg, val);
       } else { brushStroke(drag.last, p); drag.last = p; dirty(); }
     });
-    const end = () => { if (drag) { drag = null; frozenRange = null; if (S.tool === 'points') $('edCv').style.cursor = 'grab'; queue('ed'); } };
+    const end = () => { if (drag) { drag = null; frozenRange = null; if (S.tool === 'points') $('edCv').style.cursor = 'grab'; queue('ed', 'pv'); } };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
     cv.addEventListener('pointerleave', () => { if (!drag) { hover = null; queue('ed'); } });
     const del = e => {
@@ -1277,7 +1277,9 @@
     $('floorTitle').textContent = ceil ? 'Ceiling' : 'Floor';
     $('floorSub').textContent = ceil ? 'From below' : 'From above';
     let A;
+    // while anything is being dragged, Fit keeps the last zoom; it refits once the point is let go
     if (pvDrag) A = pvDrag.A;
+    else if (S.fit && (drag || kDrag) && PF && PF.A && PF.ceil === ceil && PF.Hs === Hs) A = PF.A;
     else {
       const spread = ceil ? (upSpread() || 45) : (cs.gmax || 20);
       A = S.fit ? clamp(Hs * Math.tan(Math.min(spread, 82) * DEG) * 1.12, Hs * 0.35, Hs * 6) : S.floorRange;
